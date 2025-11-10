@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Google Maps Scraper{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts - Kanit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'kanit': ['Kanit', 'sans-serif'],
+                    },
+                    colors: {
+                        'google-blue': '#4285f4',
+                        'google-red': '#ea4335',
+                        'google-yellow': '#fbbc04',
+                        'google-green': '#34a853',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+        }
+
+        .material-icons {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            vertical-align: middle;
+        }
+
+        /* Smooth transitions */
+        * {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #d1d1d1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #b1b1b1;
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes pulse-soft {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .animate-pulse-soft {
+            animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <span class="material-icons text-google-blue text-3xl">location_on</span>
+                    <a href="/" class="text-xl font-semibold text-gray-900 hover:text-google-blue">
+                        Maps Scraper
+                    </a>
+                </div>
+
+                <!-- Navigation Menu -->
+                <div class="hidden md:flex items-center space-x-1">
+                    <a href="/search" class="nav-link px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue flex items-center space-x-2">
+                        <span class="material-icons text-xl">search</span>
+                        <span>ค้นหา</span>
+                    </a>
+                    <a href="/tasks" class="nav-link px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue flex items-center space-x-2">
+                        <span class="material-icons text-xl">task</span>
+                        <span>งานปัจจุบัน</span>
+                    </a>
+                    <a href="/history" class="nav-link px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue flex items-center space-x-2">
+                        <span class="material-icons text-xl">history</span>
+                        <span>ประวัติ</span>
+                    </a>
+                    <a href="/settings" class="nav-link px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue flex items-center space-x-2">
+                        <span class="material-icons text-xl">settings</span>
+                        <span>ตั้งค่า</span>
+                    </a>
+                </div>
+
+                <!-- Mobile Menu Button -->
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="p-2 rounded-lg text-gray-700 hover:bg-gray-100">
+                        <span class="material-icons">menu</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="/search" class="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue">
+                    <span class="material-icons text-xl align-middle mr-2">search</span>ค้นหา
+                </a>
+                <a href="/tasks" class="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue">
+                    <span class="material-icons text-xl align-middle mr-2">task</span>งานปัจจุบัน
+                </a>
+                <a href="/history" class="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue">
+                    <span class="material-icons text-xl align-middle mr-2">history</span>ประวัติ
+                </a>
+                <a href="/settings" class="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-google-blue">
+                    <span class="material-icons text-xl align-middle mr-2">settings</span>ตั้งค่า
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Alert Container -->
+    <div id="alert-container" class="fixed top-20 right-4 z-50 space-y-2 w-96 max-w-full"></div>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex justify-between items-center text-sm text-gray-600">
+                <p>&copy; 2025 Google Maps RPC Scraper</p>
+                <p>Made with <span class="text-red-500">♥</span> by Nextzus</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Base JavaScript -->
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        });
+
+        // Alert System
+        function showAlert(message, type = 'info', duration = 5000) {
+            const container = document.getElementById('alert-container');
+
+            const colors = {
+                'success': 'bg-green-50 border-green-200 text-green-800',
+                'error': 'bg-red-50 border-red-200 text-red-800',
+                'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+                'info': 'bg-blue-50 border-blue-200 text-blue-800'
+            };
+
+            const icons = {
+                'success': 'check_circle',
+                'error': 'error',
+                'warning': 'warning',
+                'info': 'info'
+            };
+
+            const alert = document.createElement('div');
+            alert.className = `${colors[type]} border rounded-lg p-4 shadow-lg animate-slide-in flex items-start space-x-3`;
+            alert.innerHTML = `
+                <span class="material-icons">${icons[type]}</span>
+                <div class="flex-1">
+                    <p class="font-medium">${message}</p>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-700">
+                    <span class="material-icons text-xl">close</span>
+                </button>
+            `;
+
+            container.appendChild(alert);
+
+            if (duration > 0) {
+                setTimeout(() => {
+                    alert.remove();
+                }, duration);
+            }
+        }
+
+        // Loading Overlay
+        function showLoading(message = 'กำลังโหลด...') {
+            const overlay = document.createElement('div');
+            overlay.id = 'loading-overlay';
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-lg p-6 shadow-xl flex items-center space-x-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-google-blue"></div>
+                    <span class="text-gray-700 font-medium">${message}</span>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+
+        // Highlight active nav link
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('bg-blue-50', 'text-google-blue');
+            }
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

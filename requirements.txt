@@ -1,0 +1,22 @@
+# Web Framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# HTTP Requests
+httpx>=0.25.2
+requests==2.31.0
+
+# Data Processing
+pandas==2.1.4
+
+# Async Support
+asyncio==3.4.3
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Utilities
+python-dotenv==1.0.0
+
+# Optional: For better performance
+gunicorn==21.2.0

@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+
+{% block title %}ประวัติ - Google Maps Scraper{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center space-x-2">
+            <span class="material-icons text-google-blue text-4xl">history</span>
+            <span>ประวัติงาน</span>
+        </h1>
+        <p class="text-gray-600">ดูงานที่ดำเนินการมาแล้วทั้งหมด</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+            <div class="flex items-center space-x-4">
+                <!-- Date Range Filter -->
+                <div>
+                    <label for="date-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                        ช่วงเวลา
+                    </label>
+                    <select id="date-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue">
+                        <option value="">ทั้งหมด</option>
+                        <option value="today">วันนี้</option>
+                        <option value="7days">7 วันที่แล้ว</option>
+                        <option value="30days">30 วันที่แล้ว</option>
+                        <option value="90days">90 วันที่แล้ว</option>
+                    </select>
+                </div>
+
+                <!-- Status Filter -->
+                <div>
+                    <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">
+                        สถานะ
+                    </label>
+                    <select id="status-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue">
+                        <option value="">ทั้งหมด</option>
+                        <option value="completed">สำเร็จ</option>
+                        <option value="failed">ล้มเหลว</option>
+                    </select>
+                </div>
+
+                <!-- Search -->
+                <div>
+                    <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">
+                        ค้นหา
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="ค้นหาชื่อสถานที่..."
+                            class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue w-64"
+                        >
+                        <span class="material-icons absolute left-3 top-2.5 text-gray-400">search</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <button
+                    onclick="refreshHistory()"
+                    class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                >
+                    <span class="material-icons text-xl">refresh</span>
+                    <span>รีเฟรช</span>
+                </button>
+                <button
+                    onclick="clearFilters()"
+                    class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+                >
+                    ล้างตัวกรอง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="grid md:grid-cols-4 gap-4 mb-6" id="stats-summary">
+        <!-- Stats will be inserted here -->
+    </div>
+
+    <!-- History List -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">ประวัติงานทั้งหมด</h2>
+            <p class="text-sm text-gray-600">
+                พบ <span id="filtered-count" class="font-semibold">0</span> งาน จากทั้งหมด <span id="total-count" class="font-semibold">0</span> งาน
+            </p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="p-12 text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-google-blue mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">กำลังโหลดประวัติ...</h3>
+            <p class="text-gray-600">กรุณารอสักครู่</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden p-12 text-center">
+            <span class="material-icons text-gray-400 mb-4" style="font-size: 64px;">history</span>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">ยังไม่มีประวัติงาน</h3>
+            <p class="text-gray-600 mb-4">เริ่มดึงข้อมูลสถานที่เพื่อดูประวัติที่นี่</p>
+            <a href="/search" class="inline-flex items-center space-x-2 bg-google-blue hover:bg-blue-600 text-white font-medium px-6 py-2 rounded-lg">
+                <span class="material-icons">search</span>
+                <span>เริ่มค้นหา</span>
+            </a>
+        </div>
+
+        <!-- History List -->
+        <div id="history-list" class="hidden divide-y divide-gray-200">
+            <!-- History items will be inserted here -->
+        </div>
+    </div>
+</div>
+
+<!-- Task Detail Modal (reuse from tasks page) -->
+<div id="task-detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-gray-900">รายละเอียดงาน</h2>
+            <button onclick="closeTaskDetail()" class="text-gray-500 hover:text-gray-700">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+        <div id="task-detail-content" class="p-6">
+            <!-- Task details will be inserted here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allHistory = [];
+    let filteredHistory = [];
+
+    // Load history
+    async function loadHistory() {
+        try {
+            const response = await fetch('/api/history');
+            const data = await response.json();
+
+            document.getElementById('loading-state').classList.add('hidden');
+
+            if (data.success) {
+                allHistory = data.history || [];
+                displayHistory(data.history);
+            } else {
+                showAlert('เกิดข้อผิดพลาดในการโหลดประวัติ', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to load history:', error);
+            document.getElementById('loading-state').classList.add('hidden');
+            showAlert('เกิดข้อผิดพลาดในการเหลือประวัติ', 'error');
+        }
+    }
+
+    // Display history
+    function displayHistory(history) {
+        if (history.length === 0) {
+            document.getElementById('empty-state').classList.remove('hidden');
+            updateStats([]);
+            return;
+        }
+
+        document.getElementById('empty-state').classList.add('hidden');
+        document.getElementById('history-list').classList.remove('hidden');
+
+        filteredHistory = [...history];
+        updateHistoryDisplay();
+        updateStats(history);
+
+        // Setup filters
+        setupFilters();
+    }
+
+    // Setup filters
+    function setupFilters() {
+        document.getElementById('date-filter').addEventListener('change', applyFilters);
+        document.getElementById('status-filter').addEventListener('change', applyFilters);
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+    }
+
+    // Apply filters
+    function applyFilters() {
+        const dateFilter = document.getElementById('date-filter').value;
+        const statusFilter = document.getElementById('status-filter').value;
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+        filteredHistory = allHistory.filter(task => {
+            // Date filter
+            if (dateFilter) {
+                const taskDate = new Date(task.completed_at || task.created_at);
+                const now = new Date();
+                const daysDiff = (now - taskDate) / (1000 * 60 * 60 * 24);
+
+                switch (dateFilter) {
+                    case 'today':
+                        if (daysDiff > 1) return false;
+                        break;
+                    case '7days':
+                        if (daysDiff > 7) return false;
+                        break;
+                    case '30days':
+                        if (daysDiff > 30) return false;
+                        break;
+                    case '90days':
+                        if (daysDiff > 90) return false;
+                        break;
+                }
+            }
+
+            // Status filter
+            if (statusFilter) {
+                const status = task.error ? 'failed' : 'completed';
+                if (status !== statusFilter) return false;
+            }
+
+            // Search filter
+            if (searchTerm) {
+                const places = task.places || [];
+                const hasMatch = places.some(place =>
+                    place.name.toLowerCase().includes(searchTerm) ||
+                    place.address.toLowerCase().includes(searchTerm)
+                );
+                if (!hasMatch) return false;
+            }
+
+            return true;
+        });
+
+        updateHistoryDisplay();
+    }
+
+    // Update history display
+    function updateHistoryDisplay() {
+        const historyList = document.getElementById('history-list');
+        const filteredCount = document.getElementById('filtered-count');
+        const totalCount = document.getElementById('total-count');
+
+        filteredCount.textContent = filteredHistory.length;
+        totalCount.textContent = allHistory.length;
+
+        if (filteredHistory.length === 0) {
+            historyList.innerHTML = `
+                <div class="p-8 text-center">
+                    <span class="material-icons text-gray-400 mb-2" style="font-size: 48px;">search_off</span>
+                    <p class="text-gray-600">ไม่พบงานที่ตรงกับเงื่อนไข</p>
+                </div>
+            `;
+            return;
+        }
+
+        historyList.innerHTML = filteredHistory.map(task => createHistoryItem(task)).join('');
+    }
+
+    // Create history item
+    function createHistoryItem(task) {
+        const status = task.error ? 'failed' : 'completed';
+        const statusConfig = {
+            'completed': {
+                text: 'สำเร็จ',
+                color: 'text-green-700',
+                bgColor: 'bg-green-100',
+                icon: 'check_circle'
+            },
+            'failed': {
+                text: 'ล้มเหลว',
+                color: 'text-red-700',
+                bgColor: 'bg-red-100',
+                icon: 'error'
+            }
+        };
+
+        const config = statusConfig[status];
+        const createdAt = new Date(task.created_at).toLocaleString('th-TH');
+        const completedAt = task.completed_at ? new Date(task.completed_at).toLocaleString('th-TH') : '-';
+
+        return `
+            <div class="p-6 hover:bg-gray-50">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3 mb-3">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium ${config.bgColor} ${config.color} flex items-center space-x-1">
+                                <span class="material-icons text-sm">${config.icon}</span>
+                                <span>${config.text}</span>
+                            </span>
+                            <span class="text-sm text-gray-500">${task.task_id}</span>
+                            ${task.total_places ? `<span class="text-sm text-gray-600">${task.total_places} สถานที่</span>` : ''}
+                            ${task.total_reviews ? `<span class="text-sm text-gray-600">${task.total_reviews.toLocaleString()} รีวิว</span>` : ''}
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-4 mb-3">
+                            <div>
+                                <p class="text-sm text-gray-600 mb-1">สถานที่:</p>
+                                <div class="text-sm">
+                                    ${(task.places || []).slice(0, 3).map(p => `<span class="inline-block bg-gray-100 px-2 py-1 rounded mr-2 mb-1">${p.name}</span>`).join('')}
+                                    ${(task.places || []).length > 3 ? `<span class="text-gray-500">+${(task.places || []).length - 3} อื่นๆ</span>` : ''}
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600 mb-1">เวลา:</p>
+                                <p class="text-sm text-gray-900">เริ่ม: ${createdAt}</p>
+                                ${task.completed_at ? `<p class="text-sm text-gray-900">สำเร็จ: ${completedAt}</p>` : ''}
+                            </div>
+                        </div>
+
+                        ${task.settings ? `
+                            <div class="text-sm text-gray-600">
+                                <p class="mb-1">การตั้งค่า:</p>
+                                <div class="flex flex-wrap gap-2">
+                                    ${task.settings.max_reviews ? `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">สูงสุด ${task.settings.max_reviews} รีวิว</span>` : ''}
+                                    ${task.settings.date_range ? `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs">${task.settings.date_range}</span>` : ''}
+                                    ${task.settings.language ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">${task.settings.language.toUpperCase()}</span>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${task.error ? `
+                            <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <p class="text-sm text-red-800">${task.error}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="flex items-center space-x-2 ml-4">
+                        ${status === 'completed' ? `
+                            <button
+                                onclick="viewResults('${task.task_id}')"
+                                class="px-4 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-1"
+                            >
+                                <span class="material-icons text-sm">visibility</span>
+                                <span>ดูผลลัพธ์</span>
+                            </button>
+                        ` : ''}
+                        <button
+                            onclick="downloadCSV('${task.task_id}')"
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-1"
+                        >
+                            <span class="material-icons text-sm">download</span>
+                            <span>CSV</span>
+                        </button>
+                        <button
+                            onclick="downloadJSON('${task.task_id}')"
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-1"
+                        >
+                            <span class="material-icons text-sm">download</span>
+                            <span>JSON</span>
+                        </button>
+                        <button
+                            onclick="showTaskDetail('${task.task_id}')"
+                            class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                        >
+                            <span class="material-icons">info</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Update stats
+    function updateStats(history) {
+        const statsSummary = document.getElementById('stats-summary');
+
+        const totalTasks = history.length;
+        const completedTasks = history.filter(t => !t.error).length;
+        const failedTasks = history.filter(t => t.error).length;
+        const totalReviews = history.reduce((sum, t) => sum + (t.total_reviews || 0), 0);
+
+        statsSummary.innerHTML = `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-blue-600 font-medium mb-1">งานทั้งหมด</p>
+                        <p class="text-2xl font-bold text-blue-700">${totalTasks}</p>
+                    </div>
+                    <span class="material-icons text-blue-600" style="font-size: 32px;">task</span>
+                </div>
+            </div>
+
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-green-600 font-medium mb-1">สำเร็จ</p>
+                        <p class="text-2xl font-bold text-green-700">${completedTasks}</p>
+                    </div>
+                    <span class="material-icons text-green-600" style="font-size: 32px;">check_circle</span>
+                </div>
+            </div>
+
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-red-600 font-medium mb-1">ล้มเหลว</p>
+                        <p class="text-2xl font-bold text-red-700">${failedTasks}</p>
+                    </div>
+                    <span class="material-icons text-red-600" style="font-size: 32px;">error</span>
+                </div>
+            </div>
+
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-purple-600 font-medium mb-1">รีวิวทั้งหมด</p>
+                        <p class="text-2xl font-bold text-purple-700">${totalReviews.toLocaleString()}</p>
+                    </div>
+                    <span class="material-icons text-purple-600" style="font-size: 32px;">rate_review</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Clear filters
+    function clearFilters() {
+        document.getElementById('date-filter').value = '';
+        document.getElementById('status-filter').value = '';
+        document.getElementById('search-input').value = '';
+        applyFilters();
+    }
+
+    // Refresh history
+    function refreshHistory() {
+        document.getElementById('loading-state').classList.remove('hidden');
+        document.getElementById('empty-state').classList.add('hidden');
+        document.getElementById('history-list').classList.add('hidden');
+        loadHistory();
+    }
+
+    // View results
+    function viewResults(taskId) {
+        window.location.href = `/results/${taskId}`;
+    }
+
+    // Download CSV
+    function downloadCSV(taskId) {
+        window.location.href = `/api/results/${taskId}/download/csv`;
+    }
+
+    // Download JSON
+    function downloadJSON(taskId) {
+        window.location.href = `/api/results/${taskId}/download/json`;
+    }
+
+    // Show task detail
+    async function showTaskDetail(taskId) {
+        const modal = document.getElementById('task-detail-modal');
+        const content = document.getElementById('task-detail-content');
+
+        modal.classList.remove('hidden');
+
+        try {
+            const response = await fetch(`/api/results/${taskId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const task = data.metadata;
+
+                content.innerHTML = `
+                    <div class="space-y-4">
+                        <div>
+                            <h3 class="font-semibold text-gray-900 mb-2">ข้อมูลงาน</h3>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p class="text-gray-600">Task ID:</p>
+                                    <p class="font-medium">${task.task_id}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">สถานะ:</p>
+                                    <p class="font-medium ${task.error ? 'text-red-700' : 'text-green-700'}">${task.error ? 'ล้มเหลว' : 'สำเร็จ'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">สร้างเมื่อ:</p>
+                                    <p class="font-medium">${new Date(task.created_at).toLocaleString('th-TH')}</p>
+                                </div>
+                                ${task.completed_at ? `
+                                    <div>
+                                        <p class="text-gray-600">สำเร็จเมื่อ:</p>
+                                        <p class="font-medium">${new Date(task.completed_at).toLocaleString('th-TH')}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-semibold text-gray-900 mb-2">สถิติ</h3>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p class="text-gray-600">จำนวนสถานที่:</p>
+                                    <p class="font-medium">${task.total_places || 0}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">รีวิวทั้งหมด:</p>
+                                    <p class="font-medium">${task.total_reviews || 0}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${task.settings ? `
+                            <div>
+                                <h3 class="font-semibold text-gray-900 mb-2">การตั้งค่า</h3>
+                                <div class="bg-gray-50 rounded-lg p-3 text-sm">
+                                    ${task.settings.max_reviews ? `<p><span class="font-medium">จำนวนรีวิว:</span> ${task.settings.max_reviews}</p>` : ''}
+                                    ${task.settings.date_range ? `<p><span class="font-medium">ช่วงเวลา:</span> ${task.settings.date_range}</p>` : ''}
+                                    ${task.settings.language ? `<p><span class="font-medium">ภาษา:</span> ${task.settings.language.toUpperCase()}</p>` : ''}
+                                    ${task.settings.region ? `<p><span class="font-medium">ภูมิภาค:</span> ${task.settings.region.toUpperCase()}</p>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${task.places ? `
+                            <div>
+                                <h3 class="font-semibold text-gray-900 mb-2">สถานที่</h3>
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    ${(task.places || []).map(p => `
+                                        <div class="text-sm mb-2">
+                                            <p class="font-medium">${p.name}</p>
+                                            <p class="text-gray-600">${p.address || 'ไม่มีที่อยู่'}</p>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${task.error ? `
+                            <div>
+                                <h3 class="font-semibold text-gray-900 mb-2">ข้อผิดพลาด</h3>
+                                <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                                    <p class="text-sm text-red-800">${task.error}</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                content.innerHTML = '<p class="text-gray-600">ไม่พบข้อมูล</p>';
+            }
+        } catch (error) {
+            content.innerHTML = '<p class="text-red-600">เกิดข้อผิดพลาดในการโหลดข้อมูล</p>';
+        }
+    }
+
+    // Close task detail
+    function closeTaskDetail() {
+        document.getElementById('task-detail-modal').classList.add('hidden');
+    }
+
+    // Load history on page load
+    loadHistory();
+</script>
+{% endblock %}

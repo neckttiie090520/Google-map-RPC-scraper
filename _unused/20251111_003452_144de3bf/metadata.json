@@ -1,0 +1,26 @@
+{
+  "task_id": "20251111_003452_144de3bf",
+  "created_at": "2025-11-11T00:34:52.936344",
+  "completed_at": "2025-11-11T00:35:27.217715",
+  "total_places": 1,
+  "total_reviews": 1999,
+  "settings": {
+    "max_reviews": 2000,
+    "date_range": "all",
+    "language": "en",
+    "region": "th"
+  },
+  "places": [
+    {
+      "address": "นพรัตน์, ตำบลศรีภูมิ อำเภอเมืองเชียงใหม่, เชียงใหม่ 50200",
+      "category": "ร้านอาหาร",
+      "latitude": 18.795817,
+      "longitude": 98.9853308,
+      "name": "สุกี้ช้างเผือก",
+      "place_id": "0x30da3a96d55b9a2d:0x49afbaf74a0fa72c",
+      "rating": 4.5,
+      "total_reviews": 2203,
+      "url": "https://www.google.com/maps/place/?q=place_id:0x30da3a96d55b9a2d:0x49afbaf74a0fa72c"
+    }
+  ]
+}

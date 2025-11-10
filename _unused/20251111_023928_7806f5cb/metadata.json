@@ -1,0 +1,25 @@
+{
+  "task_id": "20251111_023928_7806f5cb",
+  "created_at": "2025-11-11T02:39:28.739985",
+  "completed_at": "2025-11-11T02:39:30.792674",
+  "total_places": 1,
+  "total_reviews": 100,
+  "settings": {
+    "max_reviews": 100,
+    "date_range": "all",
+    "language_region": "en"
+  },
+  "places": [
+    {
+      "address": "46 Banthat Thong Rd, Wang Mai, Pathum Wan, Bangkok 10330",
+      "category": "ร้านอาหาร",
+      "latitude": 13.7428814,
+      "longitude": 100.5235422,
+      "name": "ข้าวซอยดอยคำ Khao Soi Doikham",
+      "place_id": "0x30e299e8a1818e01:0x2b71f45eddce4652",
+      "rating": 4.7,
+      "total_reviews": 230,
+      "url": "https://www.google.com/maps/place/?q=place_id:0x30e299e8a1818e01:0x2b71f45eddce4652"
+    }
+  ]
+}

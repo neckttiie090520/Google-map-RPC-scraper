@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Scraper - Kanit Redesign</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/kanit-redesign.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🗺️ Google Maps Scraper</h1>
+                <p class="header-subtitle">ดึงรีวิวจาก Google Maps แบบ RPC (ไม่ต้องใช้ API Key)</p>
+            </div>
+        </header>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        class="search-input"
+                        placeholder="ค้นหาสถานที่... (เช่น Central World, Siam Paragon)"
+                        autocomplete="off"
+                        aria-label="Search for places"
+                    >
+                    <div id="searchSuggestions" class="search-suggestions" role="listbox"></div>
+                </div>
+                <div class="search-actions">
+                    <button id="searchBtn" class="btn btn-primary" type="button">
+                        🔍 ค้นหา
+                    </button>
+                    <button id="settingsBtn" class="btn btn-secondary" type="button">
+                        ⚙️ ตั้งค่า
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div id="content" class="content-area">
+                <!-- Jobs Section -->
+                <section class="jobs-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Jobs & Progress</h2>
+                        <div class="section-actions">
+                            <div class="export-dropdown">
+                                <button id="exportBtn" class="btn btn-secondary" type="button">
+                                    📥 ส่งออก
+                                </button>
+                                <div id="exportMenu" class="export-menu">
+                                    <div class="export-option" onclick="app.exportSelectedJobs()">
+                                        📊 ส่งออกที่เลือก
+                                    </div>
+                                    <div class="export-option" onclick="app.exportAllJobs()">
+                                        📋 ส่งออกทั้งหมด
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="jobsContainer" class="jobs-container">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📋</div>
+                            <div class="empty-state-title">No jobs yet</div>
+                            <div class="empty-state-description">Start by searching for a place and scraping reviews</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Log Drawer -->
+            <aside id="logDrawer" class="log-drawer" role="complementary" aria-label="Job logs">
+                <div class="log-drawer-header">
+                    <h3 class="log-drawer-title">Job Logs</h3>
+                    <button id="logDrawerClose" class="log-drawer-close" aria-label="Close logs">
+                        ✕
+                    </button>
+                </div>
+                <div id="logContent" class="log-content" role="log">
+                    <div class="empty-state">
+                        <p>No logs available</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay" role="dialog" aria-labelledby="modalTitle" aria-hidden="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="modal-title">⚙️ ตั้งค่า</h2>
+                <button id="modalClose" class="modal-close" aria-label="Close settings">
+                    ✕
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="maxReviews" class="form-label">จำนวนรีวิวต่อร้าน:</label>
+                    <input type="number" id="maxReviews" class="form-input" value="100" min="1" max="1000">
+                </div>
+                <div class="form-group">
+                    <div class="form-checkbox-group">
+                        <input type="checkbox" id="unlimitedReviews" class="form-checkbox">
+                        <label for="unlimitedReviews">ไม่จำกัดรีวิว</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="maxPlaces" class="form-label">จำนวนร้านสูงสุดต่อการค้นหา:</label>
+                    <input type="number" id="maxPlaces" class="form-input" value="5" min="1" max="20">
+                </div>
+
+                <div class="form-group">
+                    <label for="dateRange" class="form-label">ช่วงเวลารีวิว:</label>
+                    <select id="dateRange" class="form-select">
+                        <option value="1month">1 เดือนล่าสุด</option>
+                        <option value="6months">6 เดือนล่าสุด</option>
+                        <option value="1year" selected>1 ปีล่าสุด</option>
+                        <option value="5years">5 ปีล่าสุด</option>
+                        <option value="7years">7 ปีล่าสุด</option>
+                        <option value="all">ทั้งหมด</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="language" class="form-label">ภาษา:</label>
+                    <select id="language" class="form-select">
+                        <option value="th" selected>ไทย</option>
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="region" class="form-label">พื้นที่:</label>
+                    <select id="region" class="form-select">
+                        <option value="th" selected>ประเทศไทย</option>
+                        <option value="us">United States</option>
+                        <option value="jp">Japan</option>
+                        <option value="cn">China</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelSettings" class="btn btn-secondary" type="button">ยกเลิก</button>
+                <button id="saveSettings" class="btn btn-primary" type="button">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="{{ url_for('static', filename='js/kanit-redesign.js') }}"></script>
+</body>
+</html>

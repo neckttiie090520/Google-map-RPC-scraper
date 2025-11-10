@@ -1,0 +1,24 @@
+{
+  "task_id": "20251110_221811_fba8b476",
+  "created_at": "2025-11-10T22:18:11.826620",
+  "completed_at": "2025-11-10T22:18:12.363657",
+  "total_places": 1,
+  "total_reviews": 0,
+  "settings": {
+    "max_reviews": 100,
+    "date_range": "1year",
+    "language": "th",
+    "region": "th"
+  },
+  "places": [
+    {
+      "address": "Building E, BLOCK 28, 986 ซ. จุฬาลงกรณ์ 9, แขวงวังใหม่ เขตปทุมวัน, กรุงเทพมหานคร 10330",
+      "category": "ร้านกาแฟ",
+      "name": "test place",
+      "place_id": "0x30e299030e830da9:0x312261f88bcd944e",
+      "rating": 4.6,
+      "total_reviews": 117,
+      "url": "https://www.google.com/maps/place/?q=place_id:0x30e299030e830da9:0x312261f88bcd944e"
+    }
+  ]
+}

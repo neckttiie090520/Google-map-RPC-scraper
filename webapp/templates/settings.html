@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่า - Google Maps Scraper{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center space-x-2">
+            <span class="material-icons text-google-blue text-4xl">settings</span>
+            <span>ตั้งค่า</span>
+        </h1>
+        <p class="text-gray-600">ตั้งค่าค่าเริ่มต้นสำหรับการดึงข้อมูล</p>
+    </div>
+
+    <!-- Success Message -->
+    <div id="success-message" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center space-x-2">
+            <span class="material-icons text-green-600">check_circle</span>
+            <span class="text-green-800 font-medium">บันทึกการตั้งค่าลง .env เรียบร้อย</span>
+        </div>
+    </div>
+
+    <!-- Settings Form -->
+    <form id="settings-form" class="space-y-6">
+        <!-- Language Settings -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <span class="material-icons text-google-blue text-xl">language</span>
+                <span>การตั้งค่าภาษา</span>
+            </h2>
+
+            <div class="space-y-4">
+                <!-- Single Language Region Setting -->
+                <div>
+                    <label for="language-region" class="block text-sm font-medium text-gray-700 mb-2">
+                        ภาษาและภูมิภาค
+                    </label>
+                    <select
+                        id="language-region"
+                        name="language_region"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                    >
+                        <option value="th">ภาษาไทย (ประเทศไทย)</option>
+                        <option value="en">ภาษาอังกฤษ (สหรัฐอเมริกา)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">ใช้สำหรับทั้งการค้นหาสถานที่และการดึงข้อมูลรีวิว ระบบจะกำหนดภูมิภาคให้โดยอัตโนมัติ</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Settings -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <span class="material-icons text-google-blue text-xl">search</span>
+                <span>ค้นหาสถานที่</span>
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Max Search Results -->
+                <div>
+                    <label for="max-search-results" class="block text-sm font-medium text-gray-700 mb-2">
+                        จำนวนสถานที่สูงสุดในการค้นหา
+                    </label>
+                    <input
+                        type="number"
+                        id="max-search-results"
+                        name="max_search_results"
+                        min="1"
+                        max="50"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">แนะนำ: 10-20 สถานที่ (สูงสุด: 50)</p>
+                </div>
+
+              </div>
+        </div>
+
+        <!-- Scraping Settings -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <span class="material-icons text-google-blue text-xl">content_copy</span>
+                <span>การดึงข้อมูลรีวิว</span>
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Max Reviews -->
+                <div>
+                    <label for="max-reviews" class="block text-sm font-medium text-gray-700 mb-2">
+                        จำนวนรีวิวสูงสุดต่อสถานที่
+                    </label>
+                    <div class="flex items-center space-x-3">
+                        <input
+                            type="number"
+                            id="max-reviews"
+                            name="max_reviews"
+                            min="10"
+                            max="10000"
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                        >
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="unlimited-reviews" class="w-4 h-4 text-google-blue">
+                            <span class="text-sm text-gray-700">ไม่จำกัด</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">แนะนำ: 100-500 รีวิว (ไม่จำกัด = ดึงทั้งหมด)</p>
+                </div>
+
+                <!-- Date Range -->
+                <div>
+                    <label for="date-range" class="block text-sm font-medium text-gray-700 mb-2">
+                        ช่วงเวลาของรีวิวที่ต้องการ
+                    </label>
+                    <select
+                        id="date-range"
+                        name="date_range"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue mb-3"
+                        onchange="toggleCustomDateRange()"
+                    >
+                        <option value="1month">1 เดือนที่แล้ว</option>
+                        <option value="6months">6 เดือนที่แล้ว</option>
+                        <option value="1year" selected>1 ปีที่แล้ว</option>
+                        <option value="5years">5 ปีที่แล้ว</option>
+                        <option value="all">ทั้งหมด</option>
+                        <option value="custom">กำหนดเอง</option>
+                    </select>
+
+                    <!-- Custom Date Range Fields (Hidden by default) -->
+                    <div id="custom-date-range" class="hidden space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="start-date" class="block text-sm font-medium text-gray-700 mb-1">
+                                    วันที่เริ่มต้น
+                                </label>
+                                <input
+                                    type="date"
+                                    id="start-date"
+                                    name="start_date"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-google-blue"
+                                    max=""
+                                >
+                            </div>
+                            <div>
+                                <label for="end-date" class="block text-sm font-medium text-gray-700 mb-1">
+                                    วันที่สิ้นสุด
+                                </label>
+                                <input
+                                    type="date"
+                                    id="end-date"
+                                    name="end_date"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-google-blue"
+                                    max=""
+                                >
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            เลือกช่วงวันที่ที่ต้องการดึงรีวิว ระบบจะแสดงเฉพาะรีวิวที่อยู่ในช่วงเวลานี้เท่านั้น
+                        </p>
+                    </div>
+                </div>
+
+                </div>
+        </div>
+
+        <!-- Advanced Settings -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <span class="material-icons text-google-blue text-xl">tune</span>
+                <span>การตั้งค่าขั้นสูง</span>
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Auto-save -->
+                <div>
+                    <label class="flex items-center space-x-3">
+                        <input type="checkbox" id="auto-save" name="auto_save" class="w-4 h-4 text-google-blue">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">บันทึกข้อมูลอัตโนมัติ</p>
+                            <p class="text-xs text-gray-500">บันทึกผลลัพธ์ทุกครั้งที่ดึงข้อมูล</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Show Notifications -->
+                <div>
+                    <label class="flex items-center space-x-3">
+                        <input type="checkbox" id="show-notifications" name="show_notifications" class="w-4 h-4 text-google-blue">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">แสดงการแจ้งเตือน</p>
+                            <p class="text-xs text-gray-500">แจ้งเตือนเมื่องานเสร็จสิ้น</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Auto-refresh -->
+                <div>
+                    <label class="flex items-center space-x-3">
+                        <input type="checkbox" id="auto-refresh" name="auto_refresh" class="w-4 h-4 text-google-blue">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">รีเฟรชอัตโนมัติ</p>
+                            <p class="text-xs text-gray-500">รีเฟรชหน้างานทุก 5 วินาที</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Export Format -->
+                <div>
+                    <label for="default-export" class="block text-sm font-medium text-gray-700 mb-2">
+                        รูปแบบการส่งออกเริ่มต้น
+                    </label>
+                    <select
+                        id="default-export"
+                        name="default_export"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                    >
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                        <option value="both">ทั้งสองรูปแบบ</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex justify-between">
+                <button
+                    type="button"
+                    onclick="resetToDefaults()"
+                    class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                >
+                    <span class="material-icons text-xl">restore</span>
+                    <span>คืนค่าเริ่มต้น</span>
+                </button>
+
+                <div class="flex items-center space-x-3">
+                    <button
+                        type="button"
+                        onclick="exportSettings()"
+                        class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                    >
+                        <span class="material-icons text-xl">file_download</span>
+                        <span>ส่งออกการตั้งค่า</span>
+                    </button>
+                    <button
+                        type="button"
+                        onclick="importSettings()"
+                        class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                    >
+                        <span class="material-icons text-xl">file_upload</span>
+                        <span>นำเข้าการตั้งค่า</span>
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-6 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-2 shadow-md"
+                    >
+                        <span class="material-icons text-xl">save</span>
+                        <span>บันทึกการตั้งค่า</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Import Settings Modal -->
+    <div id="import-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">นำเข้าการตั้งค่า</h3>
+            </div>
+            <div class="p-6">
+                <input
+                    type="file"
+                    id="import-file"
+                    accept=".json"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                >
+                <p class="text-xs text-gray-500 mt-2">เลือกไฟล์ JSON ที่ส่งออกไว้</p>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                    onclick="closeImportModal()"
+                    class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                    ยกเลิก
+                </button>
+                <button
+                    onclick="processImport()"
+                    class="px-4 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg"
+                >
+                    นำเข้า
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Default settings
+    const defaultSettings = {
+        max_search_results: 10,
+        language_region: 'th',
+        max_reviews: 100,
+        unlimited_reviews: false,
+        date_range: '1year',
+        start_date: null,
+        end_date: null,
+        auto_save: true,
+        show_notifications: true,
+        auto_refresh: true,
+        default_export: 'csv'
+    };
+
+    // Load settings from localStorage
+    function loadSettings() {
+        const saved = localStorage.getItem('scraper_settings');
+        return saved ? { ...defaultSettings, ...JSON.parse(saved) } : { ...defaultSettings };
+    }
+
+    // Save settings to localStorage and .env file
+    function saveSettings(settings) {
+        // Save to localStorage (existing functionality)
+        localStorage.setItem('scraper_settings', JSON.stringify(settings));
+
+        // Also save to .env file via API
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ settings: settings })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Settings saved to .env file:', data.message);
+            } else {
+                console.error('Failed to save settings to .env:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error saving settings to .env:', error);
+        });
+    }
+
+    // Populate form with settings
+    function populateForm(settings) {
+        document.getElementById('max-search-results').value = settings.max_search_results;
+        document.getElementById('language-region').value = settings.language_region;
+        document.getElementById('max-reviews').value = settings.max_reviews;
+        document.getElementById('unlimited-reviews').checked = settings.unlimited_reviews;
+        document.getElementById('date-range').value = settings.date_range;
+                document.getElementById('auto-save').checked = settings.auto_save;
+        document.getElementById('show-notifications').checked = settings.show_notifications;
+        document.getElementById('auto-refresh').checked = settings.auto_refresh;
+        document.getElementById('default-export').value = settings.default_export;
+
+        // Handle custom date range
+        if (settings.date_range === 'custom' && settings.start_date && settings.end_date) {
+            document.getElementById('start-date').value = settings.start_date;
+            document.getElementById('end-date').value = settings.end_date;
+        }
+
+        // Toggle custom date range visibility
+        toggleCustomDateRange();
+
+        // Handle unlimited reviews checkbox
+        handleUnlimitedReviews();
+    }
+
+    // Get settings from form
+    function getFormSettings() {
+        const dateRange = document.getElementById('date-range').value;
+        const languageRegion = document.getElementById('language-region').value;
+
+        return {
+            max_search_results: parseInt(document.getElementById('max-search-results').value),
+            language_region: languageRegion,
+            max_reviews: parseInt(document.getElementById('max-reviews').value),
+            unlimited_reviews: document.getElementById('unlimited-reviews').checked,
+            date_range: dateRange,
+            // Add custom dates for custom date range
+            start_date: dateRange === 'custom' ? document.getElementById('start-date').value : null,
+            end_date: dateRange === 'custom' ? document.getElementById('end-date').value : null,
+                        auto_save: document.getElementById('auto-save').checked,
+            show_notifications: document.getElementById('show-notifications').checked,
+            auto_refresh: document.getElementById('auto-refresh').checked,
+            default_export: document.getElementById('default-export').value
+        };
+    }
+
+    // Handle unlimited reviews checkbox
+    function handleUnlimitedReviews() {
+        const maxReviewsInput = document.getElementById('max-reviews');
+        const unlimitedCheckbox = document.getElementById('unlimited-reviews');
+
+        if (unlimitedCheckbox.checked) {
+            maxReviewsInput.value = 10000;
+            maxReviewsInput.disabled = true;
+        } else {
+            maxReviewsInput.value = 100;
+            maxReviewsInput.disabled = false;
+        }
+    }
+
+    // Reset to defaults
+    function resetToDefaults() {
+        if (confirm('คุณแน่ใจหรือไม่ว่าต้องการคืนค่าเริ่มต้น?')) {
+            populateForm(defaultSettings);
+            saveSettings(defaultSettings);
+            showSuccessMessage('คืนค่าเริ่มต้นเรียบร้อย');
+        }
+    }
+
+    // Toggle custom date range visibility
+    function toggleCustomDateRange() {
+        const dateRangeSelect = document.getElementById('date-range');
+        const customDateRangeDiv = document.getElementById('custom-date-range');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+
+        if (dateRangeSelect.value === 'custom') {
+            customDateRangeDiv.classList.remove('hidden');
+            // Set max date to today
+            const today = new Date().toISOString().split('T')[0];
+            startDateInput.max = today;
+            endDateInput.max = today;
+
+            // Set default dates if empty (last 30 days)
+            if (!startDateInput.value) {
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                startDateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
+            }
+            if (!endDateInput.value) {
+                endDateInput.value = today;
+            }
+        } else {
+            customDateRangeDiv.classList.add('hidden');
+        }
+    }
+
+    // Export settings
+    function exportSettings() {
+        const settings = getFormSettings();
+        const dataStr = JSON.stringify(settings, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+        const exportFileDefaultName = `scraper-settings-${new Date().toISOString().split('T')[0]}.json`;
+
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+
+        showAlert('ส่งออกการตั้งค่าเรียบร้อย', 'success');
+    }
+
+    // Import settings
+    function importSettings() {
+        document.getElementById('import-modal').classList.remove('hidden');
+    }
+
+    // Close import modal
+    function closeImportModal() {
+        document.getElementById('import-modal').classList.add('hidden');
+        document.getElementById('import-file').value = '';
+    }
+
+    // Process import
+    function processImport() {
+        const fileInput = document.getElementById('import-file');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showAlert('กรุณาเลือกไฟล์', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const settings = JSON.parse(e.target.result);
+                populateForm(settings);
+                saveSettings(settings);
+                closeImportModal();
+                showSuccessMessage('นำเข้าการตั้งค่าเรียบร้อย');
+            } catch (error) {
+                showAlert('ไฟล์ไม่ถูกต้อง', 'error');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // Show success message
+    function showSuccessMessage(message) {
+        const successDiv = document.getElementById('success-message');
+        successDiv.querySelector('span:last-child').textContent = message;
+        successDiv.classList.remove('hidden');
+
+        setTimeout(() => {
+            successDiv.classList.add('hidden');
+        }, 3000);
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load saved settings
+        const settings = loadSettings();
+        populateForm(settings);
+
+        // Setup form submit
+        document.getElementById('settings-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formSettings = getFormSettings();
+            saveSettings(formSettings);
+            showSuccessMessage('บันทึกการตั้งค่าลง .env เรียบร้อย');
+        });
+
+        // Setup unlimited reviews checkbox
+        document.getElementById('unlimited-reviews').addEventListener('change', handleUnlimitedReviews);
+
+        // Setup max reviews validation
+        document.getElementById('max-reviews').addEventListener('input', function(e) {
+            const value = parseInt(e.target.value);
+            if (value < 10) e.target.value = 10;
+            if (value > 10000) e.target.value = 10000;
+        });
+
+        // Setup max search results validation
+        document.getElementById('max-search-results').addEventListener('input', function(e) {
+            const value = parseInt(e.target.value);
+            if (value < 1) e.target.value = 1;
+            if (value > 50) e.target.value = 50;
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+*.pyc
+
+# Virtual Environment
+.venv
+venv/
+ENV/
+env/
+.virtualenv
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Outputs (keep structure, ignore data)
+outputs/**/*
+!outputs/.gitkeep
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Flask
+instance/
+.webassets-cache
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+nul
+
+# Test files (keep test_scraper.py for quick testing)
+test_*.py
+!test_scraper.py
+
+# Playwright
+.playwright-mcp/
+playwright-state.json
+
+# Cache
+.cache/
+*.cache
+
+# Database (if used in future)
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+secrets.json
+credentials.json
+api_keys.json
+
+# Screenshots
+screenshots/
+*.png
+!webapp/static/**/*.png
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/

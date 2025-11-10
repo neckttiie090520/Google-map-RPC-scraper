@@ -1,0 +1,25 @@
+{
+  "task_id": "20251111_041018_e57836d9",
+  "created_at": "2025-11-11T04:10:18.042775",
+  "completed_at": "2025-11-11T04:10:50.186414",
+  "total_places": 1,
+  "total_reviews": 2000,
+  "settings": {
+    "max_reviews": 2000,
+    "date_range": "all",
+    "language_region": "en"
+  },
+  "places": [
+    {
+      "address": "นพรัตน์, Tambon Si Phum, Mueang Chiang Mai District, Chiang Mai 50200",
+      "category": "ร้านอาหาร",
+      "latitude": 18.795817,
+      "longitude": 98.9853308,
+      "name": "Suki Changphuak",
+      "place_id": "0x30da3a96d55b9a2d:0x49afbaf74a0fa72c",
+      "rating": 4.5,
+      "total_reviews": 2203,
+      "url": "https://www.google.com/maps/place/?q=place_id:0x30da3a96d55b9a2d:0x49afbaf74a0fa72c"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "place_info": {
+    "place_name": "Place_0x30e29e...",
+    "place_id": "0x30e29ecfc2f455e1:0xc4ad0280d8906604",
+    "task_id": "scrape_1762803079",
+    "scraped_at": "2025-11-11T02:31:19.273435",
+    "total_reviews": 0
+  },
+  "settings": {
+    "max_reviews": 5,
+    "date_range": "1month",
+    "sort_by_newest": false,
+    "language": "th",
+    "region": "th",
+    "fast_mode": true,
+    "timeout": 30.0,
+    "use_proxy": false
+  },
+  "data": []
+}

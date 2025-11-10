@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}งานปัจจุบัน - Google Maps Scraper{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center space-x-2">
+            <span class="material-icons text-google-blue text-4xl">task</span>
+            <span>งานปัจจุบัน</span>
+        </h1>
+        <p class="text-gray-600">ติดตามความคืบหน้าของงานที่กำลังดำเนินการแบบ Real-time</p>
+    </div>
+
+    <!-- Tasks List -->
+    <div id="tasks-container" class="space-y-4">
+        <!-- Tasks will be inserted here with real-time updates -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <span class="material-icons text-gray-400 mb-4" style="font-size: 64px;">task_alt</span>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">ไม่มีงานที่กำลังดำเนินการ</h3>
+        <p class="text-gray-600 mb-4">เริ่มค้นหาและดึงข้อมูลสถานที่เพื่อดูงานที่นี่</p>
+        <a href="/search" class="inline-flex items-center space-x-2 bg-google-blue hover:bg-blue-600 text-white font-medium px-6 py-2 rounded-lg">
+            <span class="material-icons">search</span>
+            <span>เริ่มค้นหา</span>
+        </a>
+    </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div id="task-detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-900" id="detail-task-name">Task Detail</h2>
+                <p class="text-sm text-gray-600" id="detail-task-id"></p>
+            </div>
+            <button onclick="closeTaskDetail()" class="text-gray-500 hover:text-gray-700">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+
+        <!-- Modal Content -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Enhanced Progress Section -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                    <span class="material-icons text-google-blue">insights</span>
+                    <span>ความคืบหน้าแบบ Real-time</span>
+                </h3>
+                <div class="grid md:grid-cols-4 gap-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-sm text-blue-600 font-medium mb-1">สถานที่</p>
+                        <p class="text-2xl font-bold text-blue-700">
+                            <span id="detail-completed-places">0</span>/<span id="detail-total-places">0</span>
+                        </p>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p class="text-sm text-green-600 font-medium mb-1">รีวิว</p>
+                        <p class="text-2xl font-bold text-green-700" id="detail-total-reviews">0</p>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <p class="text-sm text-purple-600 font-medium mb-1">อัตรา</p>
+                        <p class="text-2xl font-bold text-purple-700" id="detail-rate">0</p>
+                        <p class="text-xs text-purple-600">รีวิว/วินาที</p>
+                    </div>
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                        <p class="text-sm text-orange-600 font-medium mb-1">สถานะ</p>
+                        <p class="text-lg font-bold text-orange-700" id="detail-status">-</p>
+                    </div>
+                </div>
+
+                <!-- Real-time Progress Bar -->
+                <div class="mt-4">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">ความคืบหน้าทั้งหมด</span>
+                        <span class="text-sm font-medium text-google-blue" id="detail-progress-percent">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="detail-progress-bar" class="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-300"
+                             style="width: 0%">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Place -->
+            <div id="detail-current-place-section" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex items-center space-x-2">
+                    <span class="material-icons text-yellow-600">location_on</span>
+                    <span class="text-sm text-yellow-700 font-medium">กำลังดำเนินการ:</span>
+                    <span class="text-lg font-semibold text-yellow-900" id="detail-current-place">-</span>
+                </div>
+            </div>
+
+            <!-- Logs Section -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                    <span class="material-icons text-google-blue">description</span>
+                    <span>Log การทำงาน (Real-time)</span>
+                </h3>
+                <div id="detail-logs" class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm max-h-96 overflow-y-auto">
+                    <!-- Logs will be inserted here with real-time updates -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-6 border-t border-gray-200 flex justify-end space-x-3 flex-shrink-0">
+            <button
+                onclick="closeTaskDetail()"
+                class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+                ปิด
+            </button>
+            <button
+                id="view-results-btn"
+                onclick="viewResults()"
+                class="px-6 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-1"
+            >
+                <span class="material-icons">visibility</span>
+                <span>ดูผลลัพธ์</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Store SSE connections
+    const sseConnections = new Map();
+    let currentDetailTaskId = null;
+    let detailEventSource = null;
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTasks();
+        // Refresh tasks every 5 seconds
+        setInterval(loadTasks, 5000);
+    });
+
+    // Load tasks from API
+    async function loadTasks() {
+        try {
+            const response = await fetch('/api/tasks');
+            const data = await response.json();
+
+            if (data.success) {
+                displayTasks(data.tasks);
+                setupRealtimeUpdates(data.tasks);
+            } else {
+                console.error('Failed to load tasks:', data.error);
+            }
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+        }
+    }
+
+    // Setup real-time updates using SSE
+    function setupRealtimeUpdates(tasks) {
+        // Close existing connections
+        for (const [taskId, eventSource] of sseConnections) {
+            if (!tasks.find(t => t.task_id === taskId)) {
+                eventSource.close();
+                sseConnections.delete(taskId);
+            }
+        }
+
+        // Setup new connections
+        tasks.forEach(task => {
+            if (task.status === 'running' && !sseConnections.has(task.task_id)) {
+                const eventSource = new EventSource(`/api/task-stream/${task.task_id}`);
+
+                eventSource.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+
+                        // Update task card in real-time
+                        updateTaskCard(task.task_id, data);
+
+                        // Update detail modal if it's open
+                        if (currentDetailTaskId === task.task_id) {
+                            updateTaskDetail(data);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                };
+
+                eventSource.onerror = function() {
+                    console.error(`SSE error for task ${task.task_id}`);
+                    eventSource.close();
+                    sseConnections.delete(task.task_id);
+                };
+
+                sseConnections.set(task.task_id, eventSource);
+            }
+        });
+    }
+
+    // Display tasks
+    function displayTasks(tasks) {
+        const container = document.getElementById('tasks-container');
+        const emptyState = document.getElementById('empty-state');
+
+        if (tasks.length === 0) {
+            container.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+        container.innerHTML = '';
+
+        tasks.forEach(task => {
+            const card = createEnhancedTaskCard(task);
+            container.appendChild(card);
+        });
+    }
+
+    // Create enhanced task card
+    function createEnhancedTaskCard(task) {
+        const div = document.createElement('div');
+        div.className = 'bg-white rounded-lg shadow-sm border border-gray-200 p-6';
+        div.id = `task-${task.task_id}`;
+
+        const statusColors = {
+            'pending': 'bg-gray-100 text-gray-700',
+            'running': 'bg-blue-100 text-blue-700',
+            'completed': 'bg-green-100 text-green-700',
+            'failed': 'bg-red-100 text-red-700'
+        };
+
+        const statusIcons = {
+            'pending': 'schedule',
+            'running': 'sync',
+            'completed': 'check_circle',
+            'failed': 'error'
+        };
+
+        const statusText = {
+            'pending': 'รอดำเนินการ',
+            'running': 'กำลังทำงาน',
+            'completed': 'สำเร็จ',
+            'failed': 'ล้มเหลว'
+        };
+
+        const progress = ((task.completed_places || 0) / (task.total_places || 1)) * 100;
+
+        div.innerHTML = `
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${statusColors[task.status]} flex items-center space-x-1">
+                            <span class="material-icons text-sm ${task.status === 'running' ? 'animate-spin' : ''}">${statusIcons[task.status]}</span>
+                            <span>${statusText[task.status]}</span>
+                        </span>
+                        <span class="text-xs text-gray-500">${task.task_id}</span>
+                    </div>
+
+                    <!-- Enhanced Progress Section -->
+                    <div class="mb-3">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                                ${task.completed_places || 0}/${task.total_places || 0} สถานที่
+                            </span>
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                                ${(task.total_reviews || 0).toLocaleString()} รีวิว
+                            </span>
+                            ${task.scraping_rate ? `
+                                <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+                                    ${task.scraping_rate.toFixed(1)} รีวิว/วินาที
+                                </span>
+                            ` : ''}
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-1">
+                            <div class="bg-gradient-to-r from-blue-500 to-green-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                                 style="width: ${progress}%">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>${progress.toFixed(1)}% เสร็จสิ้น</span>
+                            ${task.status === 'running' ? `
+                                <span class="text-blue-600 animate-pulse">
+                                    <span class="inline-block">●</span> กำลังดำเนินการ...
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    ${task.current_place ? `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="material-icons text-yellow-600 text-sm animate-pulse">location_on</span>
+                                <span class="text-sm font-medium text-yellow-800">กำลังดำเนินการ:</span>
+                                <span class="text-sm text-yellow-700">${task.current_place}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+                <button
+                    onclick="showTaskDetail('${task.task_id}')"
+                    class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-1"
+                >
+                    <span class="material-icons text-sm">visibility</span>
+                    <span>ดูรายละเอียด</span>
+                </button>
+            </div>
+        `;
+
+        return div;
+    }
+
+    // Update task card in real-time
+    function updateTaskCard(taskId, data) {
+        const card = document.getElementById(`task-${taskId}`);
+        if (!card) return;
+
+        // Update progress and reviews count
+        const progress = ((data.completed_places || 0) / (data.total_places || 1)) * 100;
+
+        // Update progress bar
+        const progressBar = card.querySelector('.bg-gradient-to-r');
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+        }
+
+        // Update text elements
+        const elements = card.querySelectorAll('.text-xs.font-semibold');
+        elements.forEach(el => {
+            if (el.textContent.includes('สถานที่')) {
+                el.textContent = `${data.completed_places || 0}/${data.total_places || 0} สถานที่`;
+            } else if (el.textContent.includes('รีวิว')) {
+                el.textContent = `${(data.total_reviews || 0).toLocaleString()} รีวิว`;
+            } else if (el.textContent.includes('รีวิว/วินาที') && data.scraping_rate) {
+                el.textContent = `${data.scraping_rate.toFixed(1)} รีวิว/วินาที`;
+            }
+        });
+
+        // Update current place
+        if (data.current_place) {
+            const currentPlaceEl = card.querySelector('.text-yellow-700');
+            if (currentPlaceEl) {
+                currentPlaceEl.textContent = data.current_place;
+            }
+        }
+    }
+
+    // Show task detail
+    async function showTaskDetail(taskId) {
+        try {
+            const response = await fetch(`/api/task-status/${taskId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                currentDetailTaskId = taskId;
+                showTaskDetailModal(data.task);
+                setupDetailSSE(taskId);
+            }
+        } catch (error) {
+            console.error('Error loading task detail:', error);
+        }
+    }
+
+    // Setup SSE for task detail
+    function setupDetailSSE(taskId) {
+        if (detailEventSource) {
+            detailEventSource.close();
+        }
+
+        detailEventSource = new EventSource(`/api/task-stream/${taskId}`);
+
+        detailEventSource.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                updateTaskDetail(data);
+            } catch (e) {
+                console.error('Error parsing SSE data:', e);
+            }
+        };
+
+        detailEventSource.onerror = function() {
+            console.error(`Detail SSE error for task ${taskId}`);
+            detailEventSource.close();
+        };
+    }
+
+    // Show task detail modal
+    function showTaskDetailModal(task) {
+        document.getElementById('detail-task-name').textContent = `Task Detail`;
+        document.getElementById('detail-task-id').textContent = task.task_id;
+        document.getElementById('detail-completed-places').textContent = task.completed_places || 0;
+        document.getElementById('detail-total-places').textContent = task.total_places || 0;
+        document.getElementById('detail-total-reviews').textContent = (task.total_reviews || 0).toLocaleString();
+        document.getElementById('detail-rate').textContent = task.scraping_rate ? task.scraping_rate.toFixed(1) : '0';
+        document.getElementById('detail-status').textContent = task.status;
+        document.getElementById('detail-current-place').textContent = task.current_place || '-';
+
+        // Update progress bar
+        const progress = ((task.completed_places || 0) / (task.total_places || 1)) * 100;
+        document.getElementById('detail-progress-bar').style.width = `${progress}%`;
+        document.getElementById('detail-progress-percent').textContent = `${progress.toFixed(1)}%`;
+
+        // Display logs
+        const logsContainer = document.getElementById('detail-logs');
+        if (task.logs && task.logs.length > 0) {
+            logsContainer.innerHTML = task.logs.map(log => {
+                const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                const levelColors = {
+                    'info': 'text-blue-400',
+                    'success': 'text-green-400',
+                    'warning': 'text-yellow-400',
+                    'error': 'text-red-400'
+                };
+                return `<div class="mb-1">
+                    <span class="text-gray-500">[${timestamp}]</span>
+                    <span class="${levelColors[log.level] || 'text-gray-300'}">[${log.level.toUpperCase()}]</span>
+                    <span class="text-gray-100">${log.message}</span>
+                </div>`;
+            }).join('');
+        } else {
+            logsContainer.innerHTML = '<div class="text-gray-500">ยังไม่มี log</div>';
+        }
+
+        document.getElementById('task-detail-modal').classList.remove('hidden');
+    }
+
+    // Update task detail in real-time
+    function updateTaskDetail(data) {
+        document.getElementById('detail-completed-places').textContent = data.completed_places || 0;
+        document.getElementById('detail-total-reviews').textContent = (data.total_reviews || 0).toLocaleString();
+        document.getElementById('detail-rate').textContent = data.scraping_rate ? data.scraping_rate.toFixed(1) : '0';
+        document.getElementById('detail-status').textContent = data.status;
+        document.getElementById('detail-current-place').textContent = data.current_place || '-';
+
+        const progress = ((data.completed_places || 0) / (data.total_places || 1)) * 100;
+        document.getElementById('detail-progress-bar').style.width = `${progress}%`;
+        document.getElementById('detail-progress-percent').textContent = `${progress.toFixed(1)}%`;
+    }
+
+    // Close task detail
+    function closeTaskDetail() {
+        document.getElementById('task-detail-modal').classList.add('hidden');
+        currentDetailTaskId = null;
+        if (detailEventSource) {
+            detailEventSource.close();
+            detailEventSource = null;
+        }
+    }
+
+    // View results
+    function viewResults() {
+        if (currentDetailTaskId) {
+            window.open(`/results/${currentDetailTaskId}`, '_blank');
+        }
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        for (const eventSource of sseConnections.values()) {
+            eventSource.close();
+        }
+        if (detailEventSource) {
+            detailEventSource.close();
+        }
+    });
+</script>
+{% endblock %}

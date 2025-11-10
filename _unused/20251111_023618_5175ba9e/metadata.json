@@ -1,0 +1,26 @@
+{
+  "task_id": "20251111_023618_5175ba9e",
+  "created_at": "2025-11-11T02:36:18.446400",
+  "completed_at": "2025-11-11T02:36:20.675376",
+  "total_places": 1,
+  "total_reviews": 100,
+  "settings": {
+    "max_reviews": 100,
+    "date_range": "all",
+    "language": "th",
+    "region": "th"
+  },
+  "places": [
+    {
+      "address": "22 Nimmana Haeminda Rd Lane 7, Tambon Su Thep, Mueang Chiang Mai District, Chiang Mai 50200",
+      "category": "ภัตตาคารอาหารไทย",
+      "latitude": 18.7979239,
+      "longitude": 98.9692791,
+      "name": "ข้าวซอยนิมมาน",
+      "place_id": "0x30da3a89dde356f5:0xa8e9df0a32571ee1",
+      "rating": 4.2,
+      "total_reviews": 5080,
+      "url": "https://www.google.com/maps/place/?q=place_id:0x30da3a89dde356f5:0xa8e9df0a32571ee1"
+    }
+  ]
+}

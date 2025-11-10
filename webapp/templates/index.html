@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}หน้าแรก - Google Maps Scraper{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Hero Section -->
+    <div class="text-center py-12 animate-slide-in">
+        <div class="mb-6">
+            <span class="material-icons text-google-blue" style="font-size: 80px;">location_on</span>
+        </div>
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            Google Maps Review Scraper
+        </h1>
+        <p class="text-xl text-gray-600 mb-8">
+            ดึงข้อมูลรีวิวจาก Google Maps อย่างรวดเร็วและง่ายดาย
+        </p>
+        <a href="/search" class="inline-flex items-center space-x-2 bg-google-blue hover:bg-blue-600 text-white font-medium px-8 py-3 rounded-lg shadow-lg transform hover:scale-105">
+            <span class="material-icons">search</span>
+            <span>เริ่มต้นใช้งาน</span>
+        </a>
+    </div>
+
+    <!-- Features -->
+    <div class="grid md:grid-cols-3 gap-6 mt-16 mb-12">
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md">
+            <div class="text-google-blue mb-4">
+                <span class="material-icons" style="font-size: 48px;">speed</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">รวดเร็ว</h3>
+            <p class="text-gray-600">
+                ดึงข้อมูลได้มากกว่า 40 รีวิวต่อวินาที ด้วยเทคโนโลยี RPC
+            </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md">
+            <div class="text-google-green mb-4">
+                <span class="material-icons" style="font-size: 48px;">done_all</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">ครบถ้วน</h3>
+            <p class="text-gray-600">
+                รองรับการดึงข้อมูลหลายสถานที่พร้อมกัน พร้อมส่งออกเป็น CSV และ JSON
+            </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md">
+            <div class="text-google-yellow mb-4">
+                <span class="material-icons" style="font-size: 48px;">language</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">หลายภาษา</h3>
+            <p class="text-gray-600">
+                รองรับภาษาไทย อังกฤษ และภาษาอื่นๆ ตามต้องการ
+            </p>
+        </div>
+    </div>
+
+    <!-- How to Use -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-12">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
+            <span class="material-icons text-google-blue">info</span>
+            <span>วิธีใช้งาน</span>
+        </h2>
+
+        <div class="space-y-6">
+            <div class="flex items-start space-x-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-google-blue text-white rounded-full flex items-center justify-center font-bold">
+                    1
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-900 mb-1">ค้นหาสถานที่</h3>
+                    <p class="text-gray-600">ใส่ชื่อสถานที่ที่ต้องการค้นหา เช่น "ร้านอาหาร กรุงเทพ"</p>
+                </div>
+            </div>
+
+            <div class="flex items-start space-x-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-google-green text-white rounded-full flex items-center justify-center font-bold">
+                    2
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-900 mb-1">เลือกสถานที่</h3>
+                    <p class="text-gray-600">เลือกสถานที่ที่ต้องการดึงรีวิว (เลือกได้หลายที่)</p>
+                </div>
+            </div>
+
+            <div class="flex items-start space-x-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-google-yellow text-white rounded-full flex items-center justify-center font-bold">
+                    3
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-900 mb-1">เริ่มดึงข้อมูล</h3>
+                    <p class="text-gray-600">ตั้งค่าจำนวนรีวิวและตัวเลือกอื่นๆ แล้วกดเริ่มดึงข้อมูล</p>
+                </div>
+            </div>
+
+            <div class="flex items-start space-x-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-google-red text-white rounded-full flex items-center justify-center font-bold">
+                    4
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-900 mb-1">ดาวน์โหลดผลลัพธ์</h3>
+                    <p class="text-gray-600">ดาวน์โหลดรีวิวในรูปแบบ CSV หรือ JSON</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 text-center">
+            <a href="/search" class="inline-flex items-center space-x-2 bg-google-blue hover:bg-blue-600 text-white font-medium px-6 py-2 rounded-lg">
+                <span>เริ่มใช้งานเลย</span>
+                <span class="material-icons">arrow_forward</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats (if any active tasks) -->
+    <div class="grid md:grid-cols-3 gap-6 mb-12">
+        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-blue-600 font-medium mb-1">งานที่ดำเนินการ</p>
+                    <p class="text-3xl font-bold text-blue-700" id="active-tasks-count">0</p>
+                </div>
+                <span class="material-icons text-blue-600" style="font-size: 48px;">task</span>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-green-600 font-medium mb-1">งานที่สำเร็จ</p>
+                    <p class="text-3xl font-bold text-green-700" id="completed-tasks-count">0</p>
+                </div>
+                <span class="material-icons text-green-600" style="font-size: 48px;">check_circle</span>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-purple-600 font-medium mb-1">รีวิวทั้งหมด</p>
+                    <p class="text-3xl font-bold text-purple-700" id="total-reviews-count">0</p>
+                </div>
+                <span class="material-icons text-purple-600" style="font-size: 48px;">rate_review</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load stats
+    async function loadStats() {
+        try {
+            // Load active tasks
+            const tasksRes = await fetch('/api/tasks');
+            const tasksData = await tasksRes.json();
+
+            if (tasksData.success) {
+                const activeTasks = tasksData.tasks.filter(t => t.status === 'running').length;
+                document.getElementById('active-tasks-count').textContent = activeTasks;
+            }
+
+            // Load history
+            const historyRes = await fetch('/api/history');
+            const historyData = await historyRes.json();
+
+            if (historyData.success) {
+                const completedTasks = historyData.history.length;
+                const totalReviews = historyData.history.reduce((sum, task) => {
+                    return sum + (task.total_reviews || 0);
+                }, 0);
+
+                document.getElementById('completed-tasks-count').textContent = completedTasks;
+                document.getElementById('total-reviews-count').textContent = totalReviews.toLocaleString();
+            }
+        } catch (error) {
+            console.error('Failed to load stats:', error);
+        }
+    }
+
+    // Load stats on page load
+    loadStats();
+</script>
+{% endblock %}

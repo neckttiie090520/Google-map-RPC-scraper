@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}ค้นหาสถานที่ - Google Maps Scraper{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center space-x-2">
+            <span class="material-icons text-google-blue text-4xl">search</span>
+            <span>ค้นหาสถานที่</span>
+        </h1>
+        <p class="text-gray-600">ค้นหาสถานที่ที่ต้องการดึงรีวิวจาก Google Maps</p>
+    </div>
+
+    <!-- Search Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <form id="search-form" class="space-y-4">
+            <!-- Search Query -->
+            <div>
+                <label for="search-query" class="block text-sm font-medium text-gray-700 mb-2">
+                    คำค้นหา <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="search-query"
+                    name="query"
+                    placeholder="เช่น: ร้านอาหาร กรุงเทพ"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue focus:border-transparent"
+                    required
+                >
+            </div>
+
+            <!-- Settings Row -->
+            <div class="grid md:grid-cols-3 gap-4">
+                <!-- Max Results -->
+                <div>
+                    <label for="max-results" class="block text-sm font-medium text-gray-700 mb-2">
+                        จำนวนสถานที่สูงสุด
+                    </label>
+                    <input
+                        type="number"
+                        id="max-results"
+                        name="max_results"
+                        value="10"
+                        min="1"
+                        max="50"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                    >
+                </div>
+
+                <!-- Language & Region -->
+                <div>
+                    <label for="language-region" class="block text-sm font-medium text-gray-700 mb-2">
+                        ภาษาและภูมิภาค
+                    </label>
+                    <select
+                        id="language-region"
+                        name="language_region"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                    >
+                        <option value="th">ภาษาไทย (ประเทศไทย)</option>
+                        <option value="en">ภาษาอังกฤษ (สหรัฐอเมริกา)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">เลือกภาษาที่ต้องการค้นหา ระบบจะกำหนดภูมิภาคให้โดยอัตโนมัติ</p>
+                </div>
+            </div>
+
+            <!-- Search Button -->
+            <div class="flex justify-end space-x-3">
+                <button
+                    type="button"
+                    onclick="document.getElementById('search-query').value = ''"
+                    class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                >
+                    <span class="material-icons text-xl">clear</span>
+                    <span>ล้าง</span>
+                </button>
+                <button
+                    type="submit"
+                    id="search-btn"
+                    class="px-6 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-2"
+                >
+                    <span class="material-icons text-xl">search</span>
+                    <span>ค้นหา</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Search Results -->
+    <div id="search-results" class="hidden">
+        <!-- Results Header -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">ผลการค้นหา</h2>
+                <p class="text-sm text-gray-600">พบ <span id="results-count" class="font-semibold">0</span> สถานที่</p>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button
+                    onclick="selectAll()"
+                    class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                    เลือกทั้งหมด
+                </button>
+                <button
+                    onclick="unselectAll()"
+                    class="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                    ยกเลิกทั้งหมด
+                </button>
+            </div>
+        </div>
+
+        <!-- Results List -->
+        <div id="results-list" class="space-y-3 mb-6">
+            <!-- Results will be inserted here -->
+        </div>
+
+        <!-- Selected Summary & Actions -->
+        <div id="selected-summary" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">สถานที่ที่เลือก</h3>
+                    <p class="text-sm text-gray-600">เลือกแล้ว <span id="selected-count" class="font-semibold text-google-blue">0</span> สถานที่</p>
+                </div>
+                <button
+                    onclick="proceedToScrape()"
+                    class="px-6 py-3 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-2 shadow-md transform hover:scale-105"
+                >
+                    <span class="material-icons">play_arrow</span>
+                    <span>เริ่มดึงข้อมูล</span>
+                </button>
+            </div>
+
+            <!-- Selected Places Preview -->
+            <div id="selected-places-preview" class="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">
+                <!-- Selected places will be shown here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <span class="material-icons text-gray-400 mb-4" style="font-size: 64px;">search</span>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">เริ่มค้นหาสถานที่</h3>
+        <p class="text-gray-600">กรอกคำค้นหาและกดปุ่มค้นหาเพื่อเริ่มต้น</p>
+    </div>
+</div>
+
+<!-- Scrape Settings Modal -->
+<div id="scrape-settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-gray-900">ตั้งค่าการดึงข้อมูล</h2>
+            <button onclick="closeSettingsModal()" class="text-gray-500 hover:text-gray-700">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+
+        <form id="scrape-settings-form" class="p-6 space-y-6">
+            <!-- Max Reviews -->
+            <div>
+                <label for="max-reviews" class="block text-sm font-medium text-gray-700 mb-2">
+                    จำนวนรีวิวต่อสถานที่
+                </label>
+                <div class="flex items-center space-x-4">
+                    <input
+                        type="number"
+                        id="max-reviews"
+                        name="max_reviews"
+                        value="100"
+                        min="10"
+                        max="10000"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                    >
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" id="unlimited-reviews" class="w-4 h-4 text-google-blue">
+                        <span class="text-sm text-gray-700">ไม่จำกัด</span>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">แนะนำ: 100-500 รีวิว (ไม่จำกัด = ดึงทั้งหมด)</p>
+            </div>
+
+            <!-- Date Range -->
+            <div>
+                <label for="date-range" class="block text-sm font-medium text-gray-700 mb-2">
+                    ช่วงเวลาของรีวิว
+                </label>
+                <select
+                    id="date-range"
+                    name="date_range"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                >
+                    <option value="1month">1 เดือนที่แล้ว</option>
+                    <option value="6months">6 เดือนที่แล้ว</option>
+                    <option value="1year" selected>1 ปีที่แล้ว</option>
+                    <option value="5years">5 ปีที่แล้ว</option>
+                    <option value="all">ทั้งหมด</option>
+                </select>
+            </div>
+
+            <!-- Language Settings Note -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-center space-x-2">
+                    <span class="material-icons text-blue-600 text-sm">info</span>
+                    <span class="text-sm text-blue-800">
+                        ภาษาและภูมิภาคจะใช้ตามที่ตั้งค่าไว้ใน <strong>Settings</strong>
+                        (Settings → การตั้งค่าภาษา)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                    type="button"
+                    onclick="closeSettingsModal()"
+                    class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                    ยกเลิก
+                </button>
+                <button
+                    type="submit"
+                    class="px-6 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-2"
+                >
+                    <span class="material-icons text-xl">check</span>
+                    <span>ยืนยัน</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let searchResults = [];
+    let selectedPlaces = [];
+
+    // Load settings from localStorage
+    function loadSettings() {
+        const saved = localStorage.getItem('scraper_settings');
+        return saved ? JSON.parse(saved) : {
+            language_region: 'th',  // Default fallback
+            max_search_results: 10
+        };
+    }
+
+    // Apply settings to form
+    function applySettingsToForm() {
+        const settings = loadSettings();
+        const languageSelect = document.getElementById('language-region');
+        const maxResultsInput = document.getElementById('max-results');
+
+        if (languageSelect) {
+            languageSelect.value = settings.language_region || 'th';
+        }
+        if (maxResultsInput) {
+            maxResultsInput.value = settings.max_search_results || 10;
+        }
+    }
+
+    // Apply settings when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        applySettingsToForm();
+    });
+
+    // Handle search form submit
+    document.getElementById('search-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const data = {
+            query: formData.get('query'),
+            max_results: parseInt(formData.get('max_results')),
+            language_region: formData.get('language_region')
+        };
+
+        // Show loading
+        showLoading('กำลังค้นหา...');
+        document.getElementById('empty-state').classList.add('hidden');
+
+        try {
+            const response = await fetch('/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                searchResults = result.places;
+                displaySearchResults(result.places);
+                showAlert(`พบ ${result.places.length} สถานที่`, 'success');
+            } else {
+                showAlert(result.error || 'เกิดข้อผิดพลาด', 'error');
+            }
+        } catch (error) {
+            showAlert('เกิดข้อผิดพลาดในการค้นหา', 'error');
+            console.error(error);
+        } finally {
+            hideLoading();
+        }
+    });
+
+    // Display search results
+    function displaySearchResults(places) {
+        const resultsList = document.getElementById('results-list');
+        const resultsSection = document.getElementById('search-results');
+        const resultsCount = document.getElementById('results-count');
+
+        resultsCount.textContent = places.length;
+        resultsList.innerHTML = '';
+
+        places.forEach((place, index) => {
+            const placeCard = createPlaceCard(place, index);
+            resultsList.appendChild(placeCard);
+        });
+
+        resultsSection.classList.remove('hidden');
+    }
+
+    // Create place card
+    function createPlaceCard(place, index) {
+        const div = document.createElement('div');
+        div.className = 'bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow';
+        div.innerHTML = `
+            <div class="flex items-start space-x-4">
+                <input
+                    type="checkbox"
+                    id="place-${index}"
+                    data-index="${index}"
+                    onchange="updateSelection()"
+                    class="mt-1 w-5 h-5 text-google-blue rounded focus:ring-google-blue"
+                >
+                <div class="flex-1 min-w-0">
+                    <label for="place-${index}" class="cursor-pointer block">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1">${place.name}</h3>
+                        <p class="text-sm text-gray-600 mb-2">${place.address || 'ไม่มีที่อยู่'}</p>
+                        <div class="flex items-center space-x-4 text-sm text-gray-500">
+                            ${place.rating ? `
+                                <span class="flex items-center space-x-1">
+                                    <span class="material-icons text-yellow-500 text-sm">star</span>
+                                    <span>${place.rating.toFixed(1)}</span>
+                                </span>
+                            ` : ''}
+                            ${place.total_reviews ? `
+                                <span class="flex items-center space-x-1">
+                                    <span class="material-icons text-gray-400 text-sm">rate_review</span>
+                                    <span>${place.total_reviews.toLocaleString()} รีวิว</span>
+                                </span>
+                            ` : ''}
+                            ${place.category ? `
+                                <span class="bg-gray-100 px-2 py-1 rounded text-xs">${place.category}</span>
+                            ` : ''}
+                        </div>
+                    </label>
+                </div>
+            </div>
+        `;
+        return div;
+    }
+
+    // Select all
+    function selectAll() {
+        document.querySelectorAll('input[type="checkbox"][id^="place-"]').forEach(cb => {
+            cb.checked = true;
+        });
+        updateSelection();
+    }
+
+    // Unselect all
+    function unselectAll() {
+        document.querySelectorAll('input[type="checkbox"][id^="place-"]').forEach(cb => {
+            cb.checked = false;
+        });
+        updateSelection();
+    }
+
+    // Update selection
+    function updateSelection() {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][id^="place-"]:checked');
+        selectedPlaces = Array.from(checkboxes).map(cb => {
+            const index = parseInt(cb.dataset.index);
+            return searchResults[index];
+        });
+
+        const summary = document.getElementById('selected-summary');
+        const count = document.getElementById('selected-count');
+        const preview = document.getElementById('selected-places-preview');
+
+        count.textContent = selectedPlaces.length;
+
+        if (selectedPlaces.length > 0) {
+            summary.classList.remove('hidden');
+
+            // Show preview
+            preview.innerHTML = selectedPlaces.map(p => `
+                <div class="text-sm text-gray-700 py-1">
+                    <span class="material-icons text-xs text-google-blue align-middle">check_circle</span>
+                    ${p.name}
+                </div>
+            `).join('');
+        } else {
+            summary.classList.add('hidden');
+        }
+    }
+
+    // Proceed to scrape - show settings modal
+    function proceedToScrape() {
+        if (selectedPlaces.length === 0) {
+            showAlert('กรุณาเลือกสถานที่อย่างน้อย 1 แห่ง', 'warning');
+            return;
+        }
+
+        document.getElementById('scrape-settings-modal').classList.remove('hidden');
+    }
+
+    // Close settings modal
+    function closeSettingsModal() {
+        document.getElementById('scrape-settings-modal').classList.add('hidden');
+    }
+
+    // Handle unlimited reviews checkbox
+    document.getElementById('unlimited-reviews').addEventListener('change', function(e) {
+        const maxReviewsInput = document.getElementById('max-reviews');
+        if (e.target.checked) {
+            maxReviewsInput.value = 10000;
+            maxReviewsInput.disabled = true;
+        } else {
+            maxReviewsInput.value = 100;
+            maxReviewsInput.disabled = false;
+        }
+    });
+
+    // Handle scrape settings form submit
+    document.getElementById('scrape-settings-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Get settings from localStorage (unified language_region)
+        const settingsFromStorage = loadSettings();
+        const formData = new FormData(e.target);
+        const settings = {
+            max_reviews: document.getElementById('unlimited-reviews').checked ? null : parseInt(formData.get('max_reviews')),
+            date_range: formData.get('date_range'),
+            language_region: settingsFromStorage.language_region || 'th'
+        };
+
+        const data = {
+            places: selectedPlaces,
+            settings: settings
+        };
+
+        closeSettingsModal();
+        showLoading('กำลังเริ่มดึงข้อมูล...');
+
+        try {
+            const response = await fetch('/api/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert('เริ่มดึงข้อมูลเรียบร้อย', 'success');
+
+                // Redirect to tasks page after 1 second
+                setTimeout(() => {
+                    window.location.href = '/tasks';
+                }, 1000);
+            } else {
+                showAlert(result.error || 'เกิดข้อผิดพลาด', 'error');
+            }
+        } catch (error) {
+            showAlert('เกิดข้อผิดพลาดในการเริ่มงาน', 'error');
+            console.error(error);
+        } finally {
+            hideLoading();
+        }
+    });
+</script>
+{% endblock %}

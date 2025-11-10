@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}ผลลัพธ์ - Google Maps Scraper{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="mb-8 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center space-x-2">
+                <span class="material-icons text-google-blue text-4xl">visibility</span>
+                <span>ผลลัพธ์</span>
+            </h1>
+            <p class="text-gray-600">Task ID: <span class="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{{ task_id }}</span></p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="/tasks" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                <span class="material-icons text-xl">arrow_back</span>
+                <span>กลับไปงาน</span>
+            </a>
+            <a href="/history" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+                <span class="material-icons text-xl">history</span>
+                <span>ประวัติ</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-google-blue mx-auto mb-4"></div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">กำลังโหลดผลลัพธ์...</h3>
+        <p class="text-gray-600">กรุณารอสักครู่</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <span class="material-icons text-red-500 mb-4" style="font-size: 64px;">error</span>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">ไม่พบผลลัพธ์</h3>
+        <p class="text-gray-600 mb-4">ไม่พบข้อมูลสำหรับ task นี้ หรืออาจจะยังไม่สำเร็จ</p>
+        <a href="/tasks" class="inline-flex items-center space-x-2 bg-google-blue hover:bg-blue-600 text-white font-medium px-6 py-2 rounded-lg">
+            <span class="material-icons">arrow_back</span>
+            <span>กลับไปหน้างาน</span>
+        </a>
+    </div>
+
+    <!-- Results Content -->
+    <div id="results-content" class="hidden space-y-6">
+        <!-- Stats Cards -->
+        <div class="grid md:grid-cols-4 gap-4" id="stats-cards">
+            <!-- Stats will be inserted here -->
+        </div>
+
+        <!-- Filters and Search -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div class="flex items-center space-x-4">
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="ค้นหาในข้อความรีวิว..."
+                            class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue w-64"
+                        >
+                        <span class="material-icons absolute left-3 top-2.5 text-gray-400">search</span>
+                    </div>
+
+                    <!-- Rating Filter -->
+                    <select id="rating-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue">
+                        <option value="">ทุกคะแนน</option>
+                        <option value="5">5 ดาว</option>
+                        <option value="4">4 ดาว</option>
+                        <option value="3">3 ดาว</option>
+                        <option value="2">2 ดาว</option>
+                        <option value="1">1 ดาว</option>
+                    </select>
+
+                    <!-- Sort Order -->
+                    <select id="sort-order" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue">
+                        <option value="default">เรียวิวล่าสุด (Default)</option>
+                        <option value="newest">รีวิวใหม่ที่สุด</option>
+                        <option value="oldest">รีวิวเก่าที่สุด</option>
+                        <option value="rating-high">คะแนนสูงสุด</option>
+                        <option value="rating-low">คะแนนต่ำสุด</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button
+                        onclick="exportToCSV()"
+                        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                    >
+                        <span class="material-icons text-xl">download</span>
+                        <span>CSV</span>
+                    </button>
+                    <button
+                        onclick="exportToJSON()"
+                        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                    >
+                        <span class="material-icons text-xl">download</span>
+                        <span>JSON</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reviews Table -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">รีวิวทั้งหมด</h2>
+                <p class="text-sm text-gray-600">
+                    แสดง <span id="filtered-count" class="font-semibold">0</span> / <span id="total-count" class="font-semibold">0</span> รีวิว
+                </p>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ผู้รีวิว
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                คะแนน & วันที่
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                รีวิว
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="reviews-tbody" class="bg-white divide-y divide-gray-200">
+                        <!-- Reviews will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="no-reviews" class="hidden p-12 text-center">
+                <span class="material-icons text-gray-400 mb-4" style="font-size: 64px;">rate_review</span>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">ไม่พบรีวิว</h3>
+                <p class="text-gray-600">ลองปรับเปลี่ยนตัวกรองหรือคำค้นหา</p>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between">
+            <div class="text-sm text-gray-600">
+                แสดง <span id="showing-from">0</span> - <span id="showing-to">0</span> จาก <span id="showing-total">0</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button
+                    id="prev-btn"
+                    onclick="changePage(-1)"
+                    class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                >
+                    <span class="material-icons text-sm">chevron_left</span>
+                </button>
+                <span class="px-3 py-1 text-sm text-gray-600">
+                    หน้า <span id="current-page">1</span> / <span id="total-pages">1</span>
+                </span>
+                <button
+                    id="next-btn"
+                    onclick="changePage(1)"
+                    class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                >
+                    <span class="material-icons text-sm">chevron_right</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allReviews = [];
+    let filteredReviews = [];
+    let currentPage = 1;
+    const itemsPerPage = 20;
+    const taskId = '{{ task_id }}';
+
+    // Load results
+    async function loadResults() {
+        try {
+            const response = await fetch(`/api/results/${taskId}`);
+            const data = await response.json();
+
+            document.getElementById('loading-state').classList.add('hidden');
+
+            if (data.success) {
+                allReviews = data.reviews || [];
+                displayResults(data);
+            } else {
+                document.getElementById('error-state').classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Failed to load results:', error);
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('error-state').classList.remove('hidden');
+        }
+    }
+
+    // Display results
+    function displayResults(data) {
+        const resultsContent = document.getElementById('results-content');
+        resultsContent.classList.remove('hidden');
+
+        // Display stats
+        displayStats(data.metadata, data.reviews);
+
+        // Display reviews
+        filteredReviews = [...allReviews];
+        updateReviewsDisplay();
+
+        // Setup filters
+        setupFilters();
+    }
+
+    // Display stats
+    function displayStats(metadata, reviews) {
+        const statsCards = document.getElementById('stats-cards');
+
+        const totalReviews = reviews.length;
+        const avgRating = reviews.length > 0
+            ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
+            : 0;
+
+        const ratingCounts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
+        reviews.forEach(r => {
+            if (r.rating >= 1 && r.rating <= 5) {
+                ratingCounts[r.rating]++;
+            }
+        });
+
+        statsCards.innerHTML = `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-blue-600 font-medium mb-1">รีวิวทั้งหมด</p>
+                        <p class="text-2xl font-bold text-blue-700">${totalReviews.toLocaleString()}</p>
+                    </div>
+                    <span class="material-icons text-blue-600" style="font-size: 32px;">rate_review</span>
+                </div>
+            </div>
+
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-green-600 font-medium mb-1">คะแนนเฉลี่ย</p>
+                        <p class="text-2xl font-bold text-green-700">${avgRating}</p>
+                    </div>
+                    <span class="material-icons text-green-600" style="font-size: 32px;">star</span>
+                </div>
+            </div>
+
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-yellow-600 font-medium mb-1">สถานที่</p>
+                        <p class="text-2xl font-bold text-yellow-700">${metadata.total_places || 0}</p>
+                    </div>
+                    <span class="material-icons text-yellow-600" style="font-size: 32px;">place</span>
+                </div>
+            </div>
+
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-purple-600 font-medium mb-1">5 ดาว</p>
+                        <p class="text-2xl font-bold text-purple-700">${ratingCounts[5].toLocaleString()}</p>
+                    </div>
+                    <span class="material-icons text-purple-600" style="font-size: 32px;">thumb_up</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Setup filters
+    function setupFilters() {
+        const searchInput = document.getElementById('search-input');
+        const ratingFilter = document.getElementById('rating-filter');
+        const sortOrder = document.getElementById('sort-order');
+
+        searchInput.addEventListener('input', applyFilters);
+        ratingFilter.addEventListener('change', applyFilters);
+        sortOrder.addEventListener('change', applyFilters);
+    }
+
+    // Apply filters
+    function applyFilters() {
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        const ratingFilter = document.getElementById('rating-filter').value;
+        const sortOrder = document.getElementById('sort-order').value;
+
+        // Filter reviews
+        filteredReviews = allReviews.filter(review => {
+            const matchesSearch = !searchTerm ||
+                (review.review_text && review.review_text.toLowerCase().includes(searchTerm)) ||
+                (review.author_name && review.author_name.toLowerCase().includes(searchTerm));
+
+            const matchesRating = !ratingFilter || review.rating == ratingFilter;
+
+            return matchesSearch && matchesRating;
+        });
+
+        // Apply sorting
+        switch(sortOrder) {
+            case 'newest':
+                // Sort by newest date (assuming page_number represents order, 1 = newest)
+                filteredReviews.sort((a, b) => (a.page_number || 999) - (b.page_number || 999));
+                break;
+            case 'oldest':
+                // Sort by oldest date
+                filteredReviews.sort((a, b) => (b.page_number || 0) - (a.page_number || 0));
+                break;
+            case 'rating-high':
+                // Sort by rating high to low
+                filteredReviews.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+                break;
+            case 'rating-low':
+                // Sort by rating low to high
+                filteredReviews.sort((a, b) => (a.rating || 0) - (b.rating || 0));
+                break;
+            case 'default':
+            default:
+                // Default order - keep as is (already in default order from API)
+                break;
+        }
+
+        currentPage = 1;
+        updateReviewsDisplay();
+    }
+
+    // Update reviews display
+    function updateReviewsDisplay() {
+        const tbody = document.getElementById('reviews-tbody');
+        const noReviews = document.getElementById('no-reviews');
+        const totalReviewsCount = document.getElementById('total-count');
+        const filteredReviewsCount = document.getElementById('filtered-count');
+
+        totalReviewsCount.textContent = allReviews.length;
+        filteredReviewsCount.textContent = filteredReviews.length;
+
+        if (filteredReviews.length === 0) {
+            tbody.innerHTML = '';
+            noReviews.classList.remove('hidden');
+            updatePagination(0);
+            return;
+        }
+
+        noReviews.classList.add('hidden');
+
+        // Calculate pagination
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, filteredReviews.length);
+        const pageReviews = filteredReviews.slice(startIndex, endIndex);
+
+        // Render reviews
+        tbody.innerHTML = pageReviews.map(review => createReviewRow(review)).join('');
+
+        updatePagination(filteredReviews.length);
+    }
+
+    // Create review row
+    function createReviewRow(review) {
+        const ratingStars = review.rating ? createRatingStars(review.rating) : '-';
+        const dateText = review.date_relative || '-';
+        const reviewText = (review.review_text || '').substring(0, 200);
+        const isExpanded = review.review_text && review.review_text.length > 200;
+
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">${review.author_name || 'Unknown'}</p>
+                        ${review.author_reviews_count ? `<p class="text-xs text-gray-500">${review.author_reviews_count} รีวิว</p>` : ''}
+                    </div>
+                </td>
+                <td class="px-4 py-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center space-x-1">
+                            ${ratingStars}
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-900">${dateText}</p>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-4 py-4 max-w-md">
+                    <p class="text-sm text-gray-900" id="review-text-${review.review_id}">
+                        ${reviewText}${isExpanded ? '...' : ''}
+                    </p>
+                    ${isExpanded ? `
+                        <button
+                            onclick="toggleReviewText('${review.review_id}', '${review.review_text.replace(/'/g, "\\'")}')"
+                            class="text-xs text-google-blue hover:underline mt-1"
+                        >
+                            อ่านเพิ่ม
+                        </button>
+                    ` : ''}
+                </td>
+            </tr>
+        `;
+    }
+
+    // Create rating stars
+    function createRatingStars(rating) {
+        let stars = '';
+        for (let i = 1; i <= 5; i++) {
+            if (i <= rating) {
+                stars += '<span class="material-icons text-yellow-500 text-sm">star</span>';
+            } else {
+                stars += '<span class="material-icons text-gray-300 text-sm">star</span>';
+            }
+        }
+        return stars;
+    }
+
+    // Toggle review text
+    function toggleReviewText(reviewId, fullText) {
+        const element = document.getElementById(`review-text-${reviewId}`);
+        const isShortened = element.textContent.endsWith('...');
+
+        if (isShortened) {
+            element.textContent = fullText;
+            element.nextElementSibling.textContent = 'ย่อ';
+        } else {
+            element.textContent = fullText.substring(0, 200) + '...';
+            element.nextElementSibling.textContent = 'อ่านเพิ่ม';
+        }
+    }
+
+    // Update pagination
+    function updatePagination(totalItems) {
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage + 1;
+        const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
+
+        document.getElementById('showing-from').textContent = totalItems > 0 ? startIndex : 0;
+        document.getElementById('showing-to').textContent = endIndex;
+        document.getElementById('showing-total').textContent = totalItems;
+        document.getElementById('current-page').textContent = currentPage;
+        document.getElementById('total-pages').textContent = totalPages || 1;
+
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage >= totalPages;
+    }
+
+    // Change page
+    function changePage(direction) {
+        const totalPages = Math.ceil(filteredReviews.length / itemsPerPage);
+        const newPage = currentPage + direction;
+
+        if (newPage >= 1 && newPage <= totalPages) {
+            currentPage = newPage;
+            updateReviewsDisplay();
+        }
+    }
+
+    // Export to CSV
+    function exportToCSV() {
+        window.location.href = `/api/results/${taskId}/download/csv`;
+    }
+
+    // Export to JSON
+    function exportToJSON() {
+        window.location.href = `/api/results/${taskId}/download/json`;
+    }
+
+    // Load results on page load
+    loadResults();
+</script>
+{% endblock %}

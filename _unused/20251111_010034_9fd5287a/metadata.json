@@ -1,0 +1,26 @@
+{
+  "task_id": "20251111_010034_9fd5287a",
+  "created_at": "2025-11-11T01:00:34.767551",
+  "completed_at": "2025-11-11T01:01:10.820627",
+  "total_places": 1,
+  "total_reviews": 2000,
+  "settings": {
+    "max_reviews": 7000,
+    "date_range": "all",
+    "language": "en",
+    "region": "th"
+  },
+  "places": [
+    {
+      "address": "430, 4 ถนน เจริญราษฎร์, ตำบล ฟ้าฮ่าม อำเภอเมืองเชียงใหม่, เชียงใหม่ 50000",
+      "category": "ร้านก๋วยเตี๋ยว",
+      "latitude": 18.8091471,
+      "longitude": 99.00476169999999,
+      "name": "ข้าวโซอิ",
+      "place_id": "0x30da3b587849f6d7:0x2858cea75f152cc6",
+      "rating": 4.8,
+      "total_reviews": 7453,
+      "url": "https://www.google.com/maps/place/?q=place_id:0x30da3b587849f6d7:0x2858cea75f152cc6"
+    }
+  ]
+}

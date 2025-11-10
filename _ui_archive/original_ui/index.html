@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Scraper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/google-style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗺️ Google Maps Scraper</h1>
+            <p class="subtitle">ดึงรีวิวจาก Google Maps แบบ RPC (ไม่ต้องใช้ API Key)</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="search">🔍 ค้นหาสถานที่</button>
+            <button class="tab-btn" data-tab="progress">📊 ความคืบหน้า</button>
+            <button class="tab-btn" data-tab="history">📋 ประวัติ</button>
+            <button class="settings-btn" id="settingsBtn">⚙️ ตั้งค่า</button>
+        </nav>
+
+        <!-- Search Tab -->
+        <div class="tab-content active" id="search-tab">
+            <div class="search-section">
+                <h2>ค้นหาสถานที่</h2>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="พิมพ์ชื่อสถานที่... (เช่น Central World, Siam Paragon)">
+                    <button id="searchBtn">ค้นหา</button>
+                </div>
+
+                <div id="searchResults" class="results-container"></div>
+
+                <div id="selectedPlace" class="selected-place" style="display: none;">
+                    <h3>สถานที่ที่เลือก</h3>
+                    <div id="selectedPlaceInfo"></div>
+                    <button id="startScrapeBtn" class="primary-btn">เริ่ม Scraping</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Tab -->
+        <div class="tab-content" id="progress-tab">
+            <div class="progress-section">
+                <h2>ความคืบหน้าการ Scraping</h2>
+                <div id="progressContainer" class="progress-container"></div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-content" id="history-tab">
+            <div class="history-section">
+                <h2>ประวัติการ Scraping</h2>
+                <div id="historyContainer" class="history-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>⚙️ ตั้งค่า</h2>
+
+            <div class="settings-group">
+                <h3>การตั้งค่ารีวิว</h3>
+                <div class="setting-item">
+                    <label>จำนวนรีวิวต่อร้าน:</label>
+                    <input type="number" id="maxReviews" value="100" min="1" max="1000">
+                    <label><input type="checkbox" id="unlimitedReviews"> ไม่จำกัด</label>
+                </div>
+                <div class="setting-item">
+                    <label>เวลาหยุด (วินาที):</label>
+                    <input type="number" id="stopTime" value="60" min="10" max="300">
+                    <label><input type="checkbox" id="unlimitedTime"> ไม่จำกัด</label>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>การตั้งค่าการค้นหา</h3>
+                <div class="setting-item">
+                    <label>จำนวนร้านสูงสุดต่อการค้นหา:</label>
+                    <input type="number" id="maxPlaces" value="5" min="1" max="20">
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>ระยะเวลาการเก็บรีวิว</h3>
+                <div class="setting-item">
+                    <select id="dateRange">
+                        <option value="1month">1 เดือนล่าสุด</option>
+                        <option value="6months">6 เดือนล่าสุด</option>
+                        <option value="1year" selected>1 ปีล่าสุด</option>
+                        <option value="5years">5 ปีล่าสุด</option>
+                        <option value="7years">7 ปีล่าสุด</option>
+                        <option value="all">ทั้งหมด</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>ภาษาและพื้นที่</h3>
+                <div class="setting-item">
+                    <label>ภาษา:</label>
+                    <select id="language">
+                        <option value="th" selected>ไทย</option>
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>พื้นที่:</label>
+                    <select id="region">
+                        <option value="th" selected>ประเทศไทย</option>
+                        <option value="us">United States</option>
+                        <option value="jp">Japan</option>
+                        <option value="cn">China</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="saveSettingsBtn" class="primary-btn">บันทึก</button>
+                <button id="cancelSettingsBtn" class="secondary-btn">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/google-style-enhanced.js') }}"></script>
+</body>
+</html>
