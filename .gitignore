@@ -58,6 +58,10 @@ yarn-error.log*
 outputs/**/*
 !outputs/.gitkeep
 
+# Development archives (not for GitHub)
+_unused/
+_ui_archive/
+
 # OS
 Thumbs.db
 .DS_Store
