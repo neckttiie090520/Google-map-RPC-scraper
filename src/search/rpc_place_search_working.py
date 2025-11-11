@@ -119,7 +119,7 @@ class RpcPlaceSearch:
                 print(f"[RPC SEARCH] Searching for: [query]")
             print(f"[RPC SEARCH] Location: {lat}, {lon}")
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.get(url, params=params, headers=headers)
 
                 print(f"[RPC SEARCH] Status: {response.status_code}")

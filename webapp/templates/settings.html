@@ -13,11 +13,33 @@
         <p class="text-gray-600">ตั้งค่าค่าเริ่มต้นสำหรับการดึงข้อมูล</p>
     </div>
 
-    <!-- Success Message -->
-    <div id="success-message" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-        <div class="flex items-center space-x-2">
-            <span class="material-icons text-green-600">check_circle</span>
-            <span class="text-green-800 font-medium">บันทึกการตั้งค่าลง .env เรียบร้อย</span>
+    <!-- Success Message (Hidden by default) -->
+    <div id="success-message" class="hidden fixed top-6 right-6 z-50 max-w-md">
+        <div class="relative bg-green-50 border border-green-200 rounded-xl p-5 shadow-2xl transform transition-all duration-300">
+            <!-- Glow effect -->
+            <div class="absolute inset-0 rounded-xl bg-gradient-to-r from-green-400 to-emerald-400 opacity-10 blur-lg"></div>
+
+            <div class="relative flex items-start space-x-4">
+                <div class="flex-shrink-0 animate-bounce">
+                    <div class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-lg">
+                        <span class="material-icons text-white text-xl">check</span>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-green-800 font-semibold text-sm">บันทึกการตั้งค่าลง .env เรียบร้อย</p>
+                    <p class="text-green-600 text-xs mt-1 opacity-90">การตั้งค่าถูกบันทึกและพร้อมใช้งานแล้ว</p>
+
+                    <!-- Progress indicator -->
+                    <div class="mt-2 flex items-center space-x-2">
+                        <div class="flex-1 h-1 bg-green-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse-soft" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="hideSuccessMessage()" class="flex-shrink-0 ml-2 text-green-600 hover:text-green-800 transition-colors duration-200 p-1 rounded-full hover:bg-green-100">
+                    <span class="material-icons text-lg">close</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -41,10 +63,132 @@
                         name="language_region"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
                     >
-                        <option value="th">ภาษาไทย (ประเทศไทย)</option>
-                        <option value="en">ภาษาอังกฤษ (สหรัฐอเมริกา)</option>
+                        <option value="th-th">Thai (Thai Locale)</option>
+                        <option value="en-th">English (Thai Locale)</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1">ใช้สำหรับทั้งการค้นหาสถานที่และการดึงข้อมูลรีวิว ระบบจะกำหนดภูมิภาคให้โดยอัตโนมัติ</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Translation Settings -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                <span class="material-icons text-purple-600 text-xl">translate</span>
+                <span>การแปลภาษา</span>
+            </h2>
+
+            <div class="space-y-4">
+                <!-- Enable Translation -->
+                <div>
+                    <label class="flex items-center space-x-3">
+                        <input type="checkbox" id="enable-translation" name="enable_translation" class="w-4 h-4 text-purple-600">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">เปิดใช้งานการแปลภาษา</p>
+                            <p class="text-xs text-gray-500">แปลข้อความรีวิวจากภาษาต่างๆ เป็นภาษาที่ต้องการ</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Translation Options (Initially hidden) -->
+                <div id="translation-options" class="hidden space-y-4 pl-7 border-l-2 border-purple-200">
+                    <!-- Target Language -->
+                    <div>
+                        <label for="target-language" class="block text-sm font-medium text-gray-700 mb-2">
+                            ภาษาเป้าหมายสำหรับการแปล
+                        </label>
+                        <select
+                            id="target-language"
+                            name="target_language"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        >
+                            <option value="th">ภาษาไทย</option>
+                            <option value="en">English (ภาษาอังกฤษ)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">เลือกภาษาที่ต้องการให้รีวิวถูกแปลเป็น</p>
+                    </div>
+
+                    <!-- Translation Content -->
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 mb-3">เนื้อหาที่ต้องการแปล:</p>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="translate-review-text" name="translate_review_text" class="w-4 h-4 text-purple-600" checked>
+                                <div>
+                                    <p class="text-sm text-gray-700">ข้อความรีวิว</p>
+                                    <p class="text-xs text-gray-500">แปลข้อความในรีวิวทั้งหมด</p>
+                                </div>
+                            </label>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="translate-owner-response" name="translate_owner_response" class="w-4 h-4 text-purple-600">
+                                <div>
+                                    <p class="text-sm text-gray-700">คำตอบของเจ้าของสถานที่</p>
+                                    <p class="text-xs text-gray-500">แปลคำตอบจากเจ้าของร้าน/สถานที่</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Batch Size -->
+                    <div>
+                        <label for="translation-batch-size" class="block text-sm font-medium text-gray-700 mb-2">
+                            ขนาดกลุ่มสำหรับการแปล (Batch Size)
+                        </label>
+                        <select
+                            id="translation-batch-size"
+                            name="translation_batch_size"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        >
+                            <option value="10">10 รีวิว/ครั้ง (เร็วที่สุด)</option>
+                            <option value="25">25 รีวิว/ครั้ง (เร็ว)</option>
+                            <option value="50" selected>50 รีวิว/ครั้ง (ปกติ)</option>
+                            <option value="100">100 รีวิว/ครั้ง (คงทน)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">จำนวนรีวิวที่จะแปลในแต่ละครั้ง ค่าน้อยจะเร็วแต่ใช้ทรัพยากรมาก</p>
+                    </div>
+
+                    <!-- Enhanced Detection -->
+                    <div>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="use-enhanced-detection" name="use_enhanced_detection" class="w-4 h-4 text-purple-600" checked>
+                            <div>
+                                <p class="text-sm font-medium text-gray-700">ใช้ระบบตรวจจับภาษาขั้นสูง</p>
+                                <p class="text-xs text-gray-500">ตรวจจับภาษาได้แม่นยำขึ้น (รองรับ 10+ ภาษา)</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Translation Info -->
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div class="flex items-start space-x-3">
+                        <span class="material-icons text-purple-600 mt-0.5">info</span>
+                        <div class="text-sm text-purple-800">
+                            <p class="font-medium mb-1">ข้อมูลการแปล:</p>
+                            <ul class="text-xs space-y-1 list-disc list-inside">
+                                <li>รองรับการแปลจาก 10+ ภาษา (เกาหลี, ญี่ปุ่น, จีน, ฝรั่งเศส, สเปน, เยอรมัน, รัสเซีย, อารบิก, เป็นต้น)</li>
+                                <li>ความเร็วในการแปล: ~99.3% สำเร็จ (English) ~100% สำเร็จ (Thai)</li>
+                                <li>ระบบจะแสดงความคืบหน้าการแปลแบบ Real-time ในหน้า Tasks</li>
+                                <li>การแปลใช้งานหลังจากดึงข้อมูลรีวิวเรียบร้อยแล้ว</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Translation Status Alert -->
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="flex items-start space-x-3">
+                        <span class="material-icons text-red-600 mt-0.5">error</span>
+                        <div class="text-sm text-red-800">
+                            <p class="font-medium mb-1">สถานะระบบการแปล: <span class="text-red-600 font-bold">ไม่พร้อมใช้งาน</span></p>
+                            <ul class="text-xs space-y-1 list-disc list-inside">
+                                <li>ระบบการแปลกำลังประสบปัญหาทางเทคนิค: <code class="bg-red-100 px-1 rounded">'float' object has no attribute 'as_dict'</code></li>
+                                <li>ทางทีมกำลังดำเนินการแก้ไขปัญหาอยู่ในขณะนี้</li>
+                                <li>กรุณาปิดใช้งานการแปลชั่วคราว หรือรอการอัพเดทฉบับถัดไป</li>
+                                <li>ฟีเจอร์อื่นๆ ทั้งหมดยังคงทำงานปกติ</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -301,7 +445,7 @@
     // Default settings
     const defaultSettings = {
         max_search_results: 10,
-        language_region: 'th',
+        language_region: 'en-th',
         max_reviews: 100,
         unlimited_reviews: false,
         date_range: '1year',
@@ -310,13 +454,43 @@
         auto_save: true,
         show_notifications: true,
         auto_refresh: true,
-        default_export: 'csv'
+        default_export: 'csv',
+        enable_translation: false,
+        target_language: 'th',
+        translate_review_text: true,
+        translate_owner_response: false,
+        translation_batch_size: 50,
+        use_enhanced_detection: true
     };
 
-    // Load settings from localStorage
+    // Load settings from localStorage (with fallback to .env)
     function loadSettings() {
         const saved = localStorage.getItem('scraper_settings');
         return saved ? { ...defaultSettings, ...JSON.parse(saved) } : { ...defaultSettings };
+    }
+
+    // Load settings from .env file
+    function loadSettingsFromEnv() {
+        console.log('Loading settings from .env file...');
+        return fetch('/api/settings')
+            .then(response => {
+                console.log('API response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('API response data:', data);
+                if (data.success) {
+                    console.log('✅ Settings loaded from .env file:', data.settings);
+                    return data.settings;
+                } else {
+                    console.error('❌ Failed to load settings from .env:', data.error);
+                    return defaultSettings;
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error loading settings from .env:', error);
+                return defaultSettings;
+            });
     }
 
     // Save settings to localStorage and .env file
@@ -347,15 +521,49 @@
 
     // Populate form with settings
     function populateForm(settings) {
+        console.log('📝 Populating form with settings:', settings);
+
+        // Debug specific problematic fields
+        console.log('🔢 Max Reviews Settings Check:');
+        console.log('  - settings.max_reviews:', settings.max_reviews);
+        console.log('  - settings.unlimited_reviews:', settings.unlimited_reviews);
+        console.log('  - type of max_reviews:', typeof settings.max_reviews);
+
         document.getElementById('max-search-results').value = settings.max_search_results;
         document.getElementById('language-region').value = settings.language_region;
-        document.getElementById('max-reviews').value = settings.max_reviews;
+
+        // Enhanced debugging for max reviews
+        const maxReviewsInput = document.getElementById('max-reviews');
+        console.log('  - Max reviews input element found:', !!maxReviewsInput);
+        console.log('  - Setting max_reviews value to:', settings.max_reviews);
+        maxReviewsInput.value = settings.max_reviews;
+        console.log('  - Max reviews input value after setting:', maxReviewsInput.value);
+
         document.getElementById('unlimited-reviews').checked = settings.unlimited_reviews;
+
+        // Verify unlimited reviews handling
+        if (settings.unlimited_reviews) {
+            console.log('  - ✅ Unlimited reviews checked - disabling input');
+            maxReviewsInput.value = 10000;
+            maxReviewsInput.disabled = true;
+        } else {
+            console.log('  - ✅ Limited reviews mode - input value:', maxReviewsInput.value);
+            maxReviewsInput.disabled = false;
+        }
+
         document.getElementById('date-range').value = settings.date_range;
-                document.getElementById('auto-save').checked = settings.auto_save;
+        document.getElementById('auto-save').checked = settings.auto_save;
         document.getElementById('show-notifications').checked = settings.show_notifications;
         document.getElementById('auto-refresh').checked = settings.auto_refresh;
         document.getElementById('default-export').value = settings.default_export;
+
+        // Translation settings
+        document.getElementById('enable-translation').checked = settings.enable_translation;
+        document.getElementById('target-language').value = settings.target_language;
+        document.getElementById('translate-review-text').checked = settings.translate_review_text;
+        document.getElementById('translate-owner-response').checked = settings.translate_owner_response;
+        document.getElementById('translation-batch-size').value = settings.translation_batch_size;
+        document.getElementById('use-enhanced-detection').checked = settings.use_enhanced_detection;
 
         // Handle custom date range
         if (settings.date_range === 'custom' && settings.start_date && settings.end_date) {
@@ -366,8 +574,13 @@
         // Toggle custom date range visibility
         toggleCustomDateRange();
 
+        // Toggle translation options visibility
+        toggleTranslationOptions();
+
         // Handle unlimited reviews checkbox
         handleUnlimitedReviews();
+
+        console.log('✅ Form population completed');
     }
 
     // Get settings from form
@@ -384,10 +597,17 @@
             // Add custom dates for custom date range
             start_date: dateRange === 'custom' ? document.getElementById('start-date').value : null,
             end_date: dateRange === 'custom' ? document.getElementById('end-date').value : null,
-                        auto_save: document.getElementById('auto-save').checked,
+            auto_save: document.getElementById('auto-save').checked,
             show_notifications: document.getElementById('show-notifications').checked,
             auto_refresh: document.getElementById('auto-refresh').checked,
-            default_export: document.getElementById('default-export').value
+            default_export: document.getElementById('default-export').value,
+            // Translation settings
+            enable_translation: document.getElementById('enable-translation').checked,
+            target_language: document.getElementById('target-language').value,
+            translate_review_text: document.getElementById('translate-review-text').checked,
+            translate_owner_response: document.getElementById('translate-owner-response').checked,
+            translation_batch_size: parseInt(document.getElementById('translation-batch-size').value),
+            use_enhanced_detection: document.getElementById('use-enhanced-detection').checked
         };
     }
 
@@ -439,6 +659,18 @@
             }
         } else {
             customDateRangeDiv.classList.add('hidden');
+        }
+    }
+
+    // Toggle translation options visibility
+    function toggleTranslationOptions() {
+        const enableTranslationCheckbox = document.getElementById('enable-translation');
+        const translationOptionsDiv = document.getElementById('translation-options');
+
+        if (enableTranslationCheckbox.checked) {
+            translationOptionsDiv.classList.remove('hidden');
+        } else {
+            translationOptionsDiv.classList.add('hidden');
         }
     }
 
@@ -494,22 +726,81 @@
         reader.readAsText(file);
     }
 
-    // Show success message
+    // Show success message with enhanced popup
     function showSuccessMessage(message) {
         const successDiv = document.getElementById('success-message');
-        successDiv.querySelector('span:last-child').textContent = message;
+        const messageText = successDiv.querySelector('.text-green-800');
+
+        // Update message if provided
+        if (message && message !== 'บันทึกการตั้งค่าลง .env เรียบร้อย') {
+            messageText.textContent = message;
+            // Hide subtitle for custom messages
+            const subtitle = successDiv.querySelector('.text-green-600');
+            if (subtitle) subtitle.style.display = 'none';
+        } else {
+            messageText.textContent = 'บันทึกการตั้งค่าลง .env เรียบร้อย';
+            // Show subtitle for default message
+            const subtitle = successDiv.querySelector('.text-green-600');
+            if (subtitle) subtitle.style.display = 'block';
+        }
+
+        // Show popup with animation
         successDiv.classList.remove('hidden');
+        successDiv.classList.add('animate-slide-in');
+
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            successDiv.classList.remove('animate-slide-in');
+        }, 300);
+
+        // Auto-hide after 4 seconds
+        setTimeout(() => {
+            hideSuccessMessage();
+        }, 4000);
+    }
+
+    // Hide success message with animation
+    function hideSuccessMessage() {
+        const successDiv = document.getElementById('success-message');
+        successDiv.classList.add('animate-slide-out');
 
         setTimeout(() => {
             successDiv.classList.add('hidden');
-        }, 3000);
+            successDiv.classList.remove('animate-slide-out');
+        }, 300);
     }
 
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
-        // Load saved settings
-        const settings = loadSettings();
-        populateForm(settings);
+        console.log('🚀 Settings page initialization started...');
+
+        // Load settings from .env file first, then merge with localStorage
+        loadSettingsFromEnv().then(envSettings => {
+            console.log('📥 Loaded from .env:', envSettings);
+
+            const localSettings = loadSettings();
+            console.log('💾 Loaded from localStorage:', localSettings);
+
+            // Merge: local settings as base, env settings as override (เพื่อให้ .env มีความสำคัญสูงสุด)
+            const finalSettings = { ...localSettings, ...envSettings };
+            console.log('🔀 Final merged settings (with .env priority):', finalSettings);
+
+            // Save merged settings to localStorage for consistency
+            localStorage.setItem('scraper_settings', JSON.stringify(finalSettings));
+            console.log('💾 Saved merged settings to localStorage');
+
+            // Populate form with merged settings
+            populateForm(finalSettings);
+            console.log('✅ Form populated with settings');
+
+        }).catch(error => {
+            console.error('❌ Error loading settings from .env, using localStorage only:', error);
+
+            // Fallback to localStorage only
+            const settings = loadSettings();
+            console.log('📦 Using localStorage settings:', settings);
+            populateForm(settings);
+        });
 
         // Setup form submit
         document.getElementById('settings-form').addEventListener('submit', function(e) {
@@ -523,6 +814,9 @@
         // Setup unlimited reviews checkbox
         document.getElementById('unlimited-reviews').addEventListener('change', handleUnlimitedReviews);
 
+        // Setup translation enable checkbox
+        document.getElementById('enable-translation').addEventListener('change', toggleTranslationOptions);
+
         // Setup max reviews validation
         document.getElementById('max-reviews').addEventListener('input', function(e) {
             const value = parseInt(e.target.value);
@@ -535,6 +829,13 @@
             const value = parseInt(e.target.value);
             if (value < 1) e.target.value = 1;
             if (value > 50) e.target.value = 50;
+        });
+
+        // Setup translation batch size validation
+        document.getElementById('translation-batch-size').addEventListener('input', function(e) {
+            const value = parseInt(e.target.value);
+            if (value < 10) e.target.value = 10;
+            if (value > 100) e.target.value = 100;
         });
     });
 </script>

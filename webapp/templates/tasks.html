@@ -70,10 +70,65 @@
                 </div>
             </div>
 
-            <!-- Current Place -->
-            <div id="detail-current-place-section" class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p class="text-sm text-yellow-700 font-medium mb-1">กำลังดำเนินการ:</p>
-                <p class="text-lg font-semibold text-yellow-900" id="detail-current-place">-</p>
+            <!-- Current Phase & Place -->
+            <div class="mb-6">
+                <!-- Current Phase -->
+                <div id="detail-current-phase-section" class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm text-blue-700 font-medium mb-1">ขั้นตอนปัจจุบัน:</p>
+                    <p class="text-lg font-semibold text-blue-900" id="detail-current-phase">กำลังเริ่มต้น...</p>
+                </div>
+
+                <!-- Current Place -->
+                <div id="detail-current-place-section" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p class="text-sm text-yellow-700 font-medium mb-1">กำลังดำเนินการ:</p>
+                    <p class="text-lg font-semibold text-yellow-900" id="detail-current-place">-</p>
+                </div>
+            </div>
+
+            <!-- Translation Progress -->
+            <div id="detail-translation-section" class="mb-6 hidden">
+                <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                    <span class="material-icons text-purple-600">translate</span>
+                    <span>การแปลภาษา</span>
+                </h3>
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div class="grid md:grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <p class="text-sm text-purple-600 font-medium mb-1">สถานะการแปล</p>
+                            <p class="text-lg font-semibold text-purple-900" id="detail-translation-status">-</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-purple-600 font-medium mb-1">ความคืบหน้า</p>
+                            <p class="text-lg font-semibold text-purple-900" id="detail-translation-progress">0%</p>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <p class="text-sm text-purple-600 font-medium mb-2">ภาษาที่พบ</p>
+                        <div id="detail-detected-languages" class="text-sm text-gray-700">
+                            <!-- Languages will be inserted here -->
+                        </div>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4 mb-3">
+                        <div>
+                            <p class="text-sm text-purple-600 font-medium mb-1">ภาษาเป้าหมาย</p>
+                            <p class="text-lg font-semibold text-purple-900" id="detail-target-language">-</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-purple-600 font-medium mb-1">รีวิวที่ต้องแปล</p>
+                            <p class="text-lg font-semibold text-purple-900" id="detail-reviews-needing-translation">-</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-purple-600 font-medium mb-1">รีวิวที่แปลแล้ว</p>
+                            <p class="text-lg font-semibold text-purple-900" id="detail-translated-count">0</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="w-full bg-purple-200 rounded-full h-2">
+                            <div id="detail-translation-progress-bar" class="bg-purple-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                                    </div>
             </div>
 
             <!-- Logs Section -->
@@ -114,6 +169,48 @@
     let activeTasks = [];
     let currentDetailTaskId = null;
     let sseConnections = {};
+
+    // Get language display names with enhanced Chinese support
+    function getLanguageName(langCode) {
+        const langNames = {
+            // English
+            'en': 'อังกฤษ',
+
+            // Asian languages
+            'th': 'ไทย',
+            'ja': 'ญี่ปุ่น',
+            'ko': 'เกาหลี',
+            'vi': 'เวียดนาม',
+            'id': 'อินโดนีเซีย',
+            'ms': 'มาเลย์',
+            'hi': 'ฮินดี',
+            'ar': 'อาหรับ',
+
+            // Chinese variants (enhanced)
+            'zh': 'จีน',
+            'zh-cn': 'จีนตัวย่อ',
+            'zh-tw': 'จีนตัวเต็ม',
+            'zh-hk': 'จีนฮ่องกง',
+            'zh-sg': 'จีนสิงคโปร์',
+            'zh-my': 'จีนมาเลเซีย',
+
+            // European languages
+            'fr': 'ฝรั่งเศส',
+            'es': 'สเปน',
+            'de': 'เยอรมัน',
+            'ru': 'รัสเซีย',
+            'ar': 'อารบิก',
+            'vi': 'เวียดนาม',
+            'id': 'อินโดนีเซีย',
+            'af': 'แอฟริกา',
+            'tr': 'ตุรกี',
+            'ca': 'คาตาลัน',
+            'cy': 'เวลส์',
+            'sv': 'สวีเดน',
+            'uk': 'ยูเครน'
+        };
+        return langNames[langCode.toLowerCase()] || langCode.toUpperCase();
+    }
 
     // Load tasks
     async function loadTasks() {
@@ -231,6 +328,33 @@
                     <span>${task.status === 'running' ? 'กำลังดึงข้อมูล...' : task.status === 'completed' ? 'ดึงข้อมูลสำเร็จ' : ''}</span>
                 </div>
             </div>
+
+            <!-- Translation Progress -->
+            ${task.translation_enabled && (task.status === 'running' || task.translation_status === 'processing') ? `
+                <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-purple-700 flex items-center space-x-1">
+                            <span class="material-icons text-sm">translate</span>
+                            <span>การแปลภาษา</span>
+                        </span>
+                        <span class="text-xs text-purple-600">
+                            ${task.translation_progress ? task.translation_progress : 'กำลังตรวจสอบภาษา...'}
+                        </span>
+                    </div>
+                    ${task.detected_languages && Object.keys(task.detected_languages).length > 0 ? `
+                        <div class="text-xs text-purple-600 mb-2">
+                            พบภาษา: ${Object.entries(task.detected_languages).map(([lang, count]) => `${getLanguageName(lang)} (${count})`).join(', ')}
+                        </div>
+                    ` : ''}
+                    <div class="w-full bg-purple-200 rounded-full h-1.5">
+                        <div class="bg-purple-600 h-1.5 rounded-full transition-all duration-500" style="width: ${task.translation_progress || 0}%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-purple-500 mt-1">
+                        <span>แปลแล้ว: ${task.translated_count || 0} รีวิว</span>
+                        <span>${task.translation_status === 'processing' ? 'กำลังแปล...' : task.translation_status === 'completed' ? 'แปลสำเร็จ' : 'รอดำเนินการ'}</span>
+                    </div>
+                </div>
+            ` : ''}
 
             <!-- Stats -->
             <div class="grid grid-cols-3 gap-4">
@@ -354,13 +478,106 @@
 
         document.getElementById('detail-status').textContent = getStatusText(task.status);
 
-        // Current place
+        // Current Phase
+        const currentPhaseSection = document.getElementById('detail-current-phase-section');
+        const currentPhaseElement = document.getElementById('detail-current-phase');
+
+        // Determine current phase text
+        if (task.status === 'completed') {
+            currentPhaseElement.textContent = 'เสร็จสมบูรณ์';
+        } else if (task.status === 'failed') {
+            currentPhaseElement.textContent = 'ล้มเหลว';
+        } else if (task.status === 'running') {
+            // Check progress phase information
+            const progress = task.progress || {};
+            const phase = progress.phase || 'rpc_collection';
+            const translationStatus = task.translation_status || 'pending';
+
+            if (phase === 'translation') {
+                if (task.translation_enabled) {
+                    currentPhaseElement.textContent = 'Phase 3: กำลังแปลภาษา';
+                } else {
+                    currentPhaseElement.textContent = 'Phase 3: ดำเนินการสำเร็จ (ไม่มีการแปล)';
+                }
+            } else if (phase === 'language_detection') {
+                currentPhaseElement.textContent = 'Phase 2: กำลังตรวจจับภาษา';
+            } else if (phase === 'ready_for_translation' || translationStatus === 'ready_for_translation') {
+                const reviewCount = task.reviews_needing_translation_count || task.review_ids_needing_translation?.length || 0;
+                currentPhaseElement.textContent = `Phase 2: เสร็จสิ้นการตรวจจับ (${reviewCount} รีวิวต้องแปล)`;
+            } else {
+                currentPhaseElement.textContent = 'Phase 1: กำลังดึงข้อมูล (RPC Collection)';
+            }
+        } else {
+            currentPhaseElement.textContent = 'รอการดำเนินการ';
+        }
+
+        // Current place (show only during RPC collection phase)
         const currentPlaceSection = document.getElementById('detail-current-place-section');
         if (task.current_place && task.status === 'running') {
-            currentPlaceSection.classList.remove('hidden');
-            document.getElementById('detail-current-place').textContent = task.current_place;
+            const progress = task.progress || {};
+            const phase = progress.phase || 'rpc_collection';
+
+            if (phase === 'rpc_collection') {
+                currentPlaceSection.classList.remove('hidden');
+                document.getElementById('detail-current-place').textContent = task.current_place;
+            } else {
+                // Hide place during translation phase
+                currentPlaceSection.classList.add('hidden');
+            }
         } else {
             currentPlaceSection.classList.add('hidden');
+        }
+
+        // Translation progress
+        const translationSection = document.getElementById('detail-translation-section');
+
+        if (task.translation_enabled && (task.status === 'running' || task.translation_status === 'processing' || task.translation_status === 'detecting' || task.translated_count > 0)) {
+            translationSection.classList.remove('hidden');
+
+            // Update translation status
+            const statusText = task.translation_status === 'processing' ? 'กำลังแปล...' :
+                            task.translation_status === 'detecting' ? 'กำลังตรวจจับภาษา...' :
+                            task.translation_status === 'completed' ? 'แปลสำเร็จ' :
+                            task.translation_status === 'failed' ? 'แปลล้มเหลว' : 'รอดำเนินการ';
+            document.getElementById('detail-translation-status').textContent = statusText;
+
+            // Update progress
+            const progress = task.translation_progress || '0%';
+            document.getElementById('detail-translation-progress').textContent = progress;
+            document.getElementById('detail-translation-progress-bar').style.width = progress;
+
+            // Update target language
+            const targetLangNames = {
+                'th': 'ไทย', 'en': 'อังกฤษ', 'ja': 'ญี่ปุ่น',
+                'zh': 'จีน', 'zh-cn': 'จีนตัวย่อ', 'zh-tw': 'จีนตัวเต็ม', 'zh-hk': 'จีนฮ่องกง',
+                'ko': 'เกาหลี', 'vi': 'เวียดนาม', 'id': 'อินโดนีเซีย', 'ms': 'มาเลย์'
+            };
+            const targetLang = targetLangNames[task.target_language] || task.target_language?.toUpperCase() || '-';
+            document.getElementById('detail-target-language').textContent = targetLang;
+
+            // Update reviews needing translation count
+            const reviewsNeedingTranslation = task.reviews_needing_translation_count || task.reviews_pending_translation || '-';
+            document.getElementById('detail-reviews-needing-translation').textContent = reviewsNeedingTranslation;
+
+            // Update translated count
+            document.getElementById('detail-translated-count').textContent = task.translated_count || 0;
+
+            // Update detected languages
+            const detectedLanguagesContainer = document.getElementById('detail-detected-languages');
+            if (task.detected_languages && Object.keys(task.detected_languages).length > 0) {
+                const languagesHTML = Object.entries(task.detected_languages)
+                    .sort((a, b) => b[1] - a[1]) // Sort by count descending
+                    .map(([lang, count]) => `
+                        <span class="inline-block bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full mr-2 mb-2">
+                            ${getLanguageName(lang)} (${count})
+                        </span>
+                    `).join('');
+                detectedLanguagesContainer.innerHTML = languagesHTML;
+            } else {
+                detectedLanguagesContainer.innerHTML = '<span class="text-gray-500">ยังไม่พบภาษา</span>';
+            }
+        } else {
+            translationSection.classList.add('hidden');
         }
 
         // Update logs
@@ -411,6 +628,7 @@
         return texts[status] || status;
     }
 
+    
     // Load tasks on page load
     loadTasks();
 

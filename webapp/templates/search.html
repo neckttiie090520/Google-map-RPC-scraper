@@ -16,23 +16,44 @@
     <!-- Search Form -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <form id="search-form" class="space-y-4">
-            <!-- Search Query -->
-            <div>
-                <label for="search-query" class="block text-sm font-medium text-gray-700 mb-2">
-                    คำค้นหา <span class="text-red-500">*</span>
-                </label>
-                <input
-                    type="text"
-                    id="search-query"
-                    name="query"
-                    placeholder="เช่น: ร้านอาหาร กรุงเทพ"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue focus:border-transparent"
-                    required
-                >
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Search Query -->
+                <div>
+                    <label for="search-query" class="block text-sm font-medium text-gray-700 mb-2">
+                        คำค้นหา <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="search-query"
+                            name="query"
+                            placeholder="เช่น: โรงแรม, ร้านอาหาร, วัด"
+                            class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue focus:border-transparent"
+                            required
+                        >
+                        <div id="query-suggestions" class="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 hidden max-h-48 overflow-y-auto">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Province Selection -->
+                <div>
+                    <label for="province-select" class="block text-sm font-medium text-gray-700 mb-2">
+                        จังหวัด (ค้นหาเฉพาะจังหวัด)
+                    </label>
+                    <select
+                        id="province-select"
+                        name="province"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue focus:border-transparent"
+                    >
+                        <option value="">ค้นหาทั่วประเทศไทย</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">เลือกจังหวัดเพื่อค้นหาที่แม่นยำขึ้น</p>
+                </div>
             </div>
 
-            <!-- Settings Row -->
-            <div class="grid md:grid-cols-3 gap-4">
+            <!-- Search Options -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Max Results -->
                 <div>
                     <label for="max-results" class="block text-sm font-medium text-gray-700 mb-2">
@@ -49,20 +70,40 @@
                     >
                 </div>
 
-                <!-- Language & Region -->
+                <!-- Language -->
                 <div>
                     <label for="language-region" class="block text-sm font-medium text-gray-700 mb-2">
-                        ภาษาและภูมิภาค
+                        ภาษา
                     </label>
                     <select
                         id="language-region"
                         name="language_region"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
                     >
-                        <option value="th">ภาษาไทย (ประเทศไทย)</option>
-                        <option value="en">ภาษาอังกฤษ (สหรัฐอเมริกา)</option>
+                        <option value="th-th">Thai (Thai Locale)</option>
+                        <option value="en-th">English (Thai Locale)</option>
                     </select>
-                    <p class="text-xs text-gray-500 mt-1">เลือกภาษาที่ต้องการค้นหา ระบบจะกำหนดภูมิภาคให้โดยอัตโนมัติ</p>
+                </div>
+
+                <!-- Quick Actions -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        คำค้นยอดนิยม
+                    </label>
+                    <div id="popular-searches" class="flex flex-wrap gap-2">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced Search Info -->
+            <div id="search-enhancement-info" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex items-start space-x-2">
+                    <span class="material-icons text-blue-600 text-sm">info</span>
+                    <div class="text-sm text-blue-800">
+                        <p class="font-semibold">การค้นหาตามจังหวัด: <span id="enhanced-province-name"></span></p>
+                        <p class="text-xs mt-1">คำค้นจะถูกปรับปรุงเป็น "<span id="enhanced-query-example"></span>"</p>
+                    </div>
                 </div>
             </div>
 
@@ -70,7 +111,7 @@
             <div class="flex justify-end space-x-3">
                 <button
                     type="button"
-                    onclick="document.getElementById('search-query').value = ''"
+                    onclick="clearSearch()"
                     class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                 >
                     <span class="material-icons text-xl">clear</span>
@@ -113,11 +154,6 @@
             </div>
         </div>
 
-        <!-- Results List -->
-        <div id="results-list" class="space-y-3 mb-6">
-            <!-- Results will be inserted here -->
-        </div>
-
         <!-- Selected Summary & Actions -->
         <div id="selected-summary" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
@@ -139,6 +175,11 @@
                 <!-- Selected places will be shown here -->
             </div>
         </div>
+
+        <!-- Results List -->
+        <div id="results-list" class="space-y-3 mb-6">
+            <!-- Results will be inserted here -->
+        </div>
     </div>
 
     <!-- Empty State -->
@@ -151,68 +192,197 @@
 
 <!-- Scrape Settings Modal -->
 <div id="scrape-settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-xl font-semibold text-gray-900">ตั้งค่าการดึงข้อมูล</h2>
+            <div>
+                <h2 class="text-xl font-semibold text-gray-900">ตั้งค่าการดึงข้อมูล</h2>
+                <p class="text-sm text-gray-600 mt-1">ตรวจสอบและยืนยันการตั้งค่าทั้งหมดก่อนเริ่มดึงข้อมูล</p>
+            </div>
             <button onclick="closeSettingsModal()" class="text-gray-500 hover:text-gray-700">
                 <span class="material-icons">close</span>
             </button>
         </div>
 
         <form id="scrape-settings-form" class="p-6 space-y-6">
-            <!-- Max Reviews -->
-            <div>
-                <label for="max-reviews" class="block text-sm font-medium text-gray-700 mb-2">
-                    จำนวนรีวิวต่อสถานที่
-                </label>
-                <div class="flex items-center space-x-4">
-                    <input
-                        type="number"
-                        id="max-reviews"
-                        name="max_reviews"
-                        value="100"
-                        min="10"
-                        max="10000"
-                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+            <!-- Basic Settings Section -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span class="material-icons text-google-blue mr-2">settings</span>
+                    การตั้งค่าพื้นฐาน
+                </h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <!-- Max Reviews -->
+                    <div>
+                        <label for="max-reviews" class="block text-sm font-medium text-gray-700 mb-2">
+                            จำนวนรีวิวต่อสถานที่
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <input
+                                type="number"
+                                id="max-reviews"
+                                name="max_reviews"
+                                value="100"
+                                min="10"
+                                max="10000"
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                            >
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="unlimited-reviews" class="w-4 h-4 text-google-blue">
+                                <span class="text-sm text-gray-700">ไม่จำกัด</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">แนะนำ: 100-500 รีวิว</p>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div>
+                        <label for="date-range" class="block text-sm font-medium text-gray-700 mb-2">
+                            ช่วงเวลาของรีวิว
+                        </label>
+                        <select
+                            id="date-range"
+                            name="date_range"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
+                        >
+                            <option value="1month">1 เดือนที่แล้ว</option>
+                            <option value="6months">6 เดือนที่แล้ว</option>
+                            <option value="1year" selected>1 ปีที่แล้ว</option>
+                            <option value="5years">5 ปีที่แล้ว</option>
+                            <option value="all">ทั้งหมด</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Language Settings Section -->
+            <div class="bg-blue-50 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span class="material-icons text-blue-600 mr-2">language</span>
+                    การตั้งค่าภาษา
+                </h3>
+                <div>
+                    <label for="modal-language-region" class="block text-sm font-medium text-gray-700 mb-2">
+                        ภาษาและภูมิภาค
+                    </label>
+                    <select
+                        id="modal-language-region"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 max-w-md"
                     >
-                    <label class="flex items-center space-x-2">
-                        <input type="checkbox" id="unlimited-reviews" class="w-4 h-4 text-google-blue">
-                        <span class="text-sm text-gray-700">ไม่จำกัด</span>
+                        <option value="th-th">Thai (Thai Locale)</option>
+                        <option value="en-th">English (Thai Locale)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">เลือกภาษาที่ต้องการดึงข้อมูลรีวิว (สามารถเปลี่ยนก่อนเริ่มได้)</p>
+                </div>
+            </div>
+
+            <!-- Translation Settings Section -->
+            <div class="bg-green-50 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span class="material-icons text-green-600 mr-2">translate</span>
+                    การตั้งค่าการแปลภาษา
+                </h3>
+
+                <!-- Translation Toggle -->
+                <div class="mb-4">
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="modal-translation-enabled" class="w-5 h-5 text-green-600 rounded focus:ring-green-500">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">เปิดใช้งานการแปลภาษา</p>
+                            <p class="text-xs text-gray-500">แปลข้อความรีวิวจากภาษาต่างๆ เป็นภาษาที่ต้องการ (สามารถเปลี่ยนก่อนเริ่มได้)</p>
+                        </div>
                     </label>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">แนะนำ: 100-500 รีวิว (ไม่จำกัด = ดึงทั้งหมด)</p>
-            </div>
 
-            <!-- Date Range -->
-            <div>
-                <label for="date-range" class="block text-sm font-medium text-gray-700 mb-2">
-                    ช่วงเวลาของรีวิว
-                </label>
-                <select
-                    id="date-range"
-                    name="date_range"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue"
-                >
-                    <option value="1month">1 เดือนที่แล้ว</option>
-                    <option value="6months">6 เดือนที่แล้ว</option>
-                    <option value="1year" selected>1 ปีที่แล้ว</option>
-                    <option value="5years">5 ปีที่แล้ว</option>
-                    <option value="all">ทั้งหมด</option>
-                </select>
-            </div>
+                <!-- Translation Options (shown when enabled) -->
+                <div id="modal-translation-options" class="hidden space-y-4 pl-7 border-l-2 border-green-200">
+                    <!-- Target Language -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            ภาษาเป้าหมายสำหรับการแปล
+                        </label>
+                        <select id="modal-target-language" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600">
+                            <option value="th">ภาษาไทย</option>
+                            <option value="en">English (ภาษาอังกฤษ)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">เลือกภาษาที่ต้องการให้รีวิวถูกแปลเป็น</p>
+                    </div>
 
-            <!-- Language Settings Note -->
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div class="flex items-center space-x-2">
-                    <span class="material-icons text-blue-600 text-sm">info</span>
-                    <span class="text-sm text-blue-800">
-                        ภาษาและภูมิภาคจะใช้ตามที่ตั้งค่าไว้ใน <strong>Settings</strong>
-                        (Settings → การตั้งค่าภาษา)
-                    </span>
+                    <!-- Translation Content -->
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 mb-3">เนื้อหาที่ต้องการแปล:</p>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="modal-translate-review-text" class="w-4 h-4 text-green-600 rounded" checked>
+                                <div>
+                                    <p class="text-sm text-gray-700">ข้อความรีวิว</p>
+                                    <p class="text-xs text-gray-500">แปลข้อความในรีวิวทั้งหมด</p>
+                                </div>
+                            </label>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" id="modal-translate-owner-response" class="w-4 h-4 text-green-600 rounded">
+                                <div>
+                                    <p class="text-sm text-gray-700">คำตอบของเจ้าของสถานที่</p>
+                                    <p class="text-xs text-gray-500">แปลคำตอบจากเจ้าของร้าน/สถานที่</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Batch Size -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            ขนาดกลุ่มสำหรับการแปล (Batch Size)
+                        </label>
+                        <select id="modal-batch-size" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600">
+                            <option value="10">10 รีวิว/ครั้ง (เร็วที่สุด)</option>
+                            <option value="25">25 รีวิว/ครั้ง (เร็ว)</option>
+                            <option value="50" selected>50 รีวิว/ครั้ง (ปกติ)</option>
+                            <option value="100">100 รีวิว/ครั้ง (คงทน)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">จำนวนรีวิวที่จะแปลในแต่ละครั้ง ค่าน้อยจะเร็วแต่ใช้ทรัพยากรมาก</p>
+                    </div>
+
+                    <!-- Enhanced Detection -->
+                    <div>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="modal-enhanced-detection" class="w-4 h-4 text-green-600 rounded">
+                            <div>
+                                <p class="text-sm font-medium text-gray-700">ใช้ระบบตรวจจับภาษาขั้นสูง</p>
+                                <p class="text-xs text-gray-500">ตรวจจับภาษาได้แม่นยำขึ้น (รองรับ 10+ ภาษา)</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-3 text-sm text-green-700">
+                    <span class="material-icons text-sm align-middle">info</span>
+                    ค่าเริ่มต้นจาก Settings → Translation Settings สามารถเปลี่ยนแปลงก่อนเริ่มได้
                 </div>
             </div>
 
-            <!-- Buttons -->
+            <!-- Summary Section -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                    <span class="material-icons text-yellow-600 mr-2">summarize</span>
+                    สรุปการดำเนินการ
+                </h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">สถานที่ที่เลือก:</span>
+                        <span id="summary-places-count" class="font-semibold text-gray-900">0 สถานที่</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">การแปลภาษา:</span>
+                        <span id="summary-translation-status" class="font-semibold text-gray-900">ปิดใช้งาน</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">ภาษาเป้าหมาย:</span>
+                        <span id="summary-target-language" class="font-semibold text-gray-900">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
             <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                 <button
                     type="button"
@@ -225,8 +395,8 @@
                     type="submit"
                     class="px-6 py-2 bg-google-blue hover:bg-blue-600 text-white rounded-lg flex items-center space-x-2"
                 >
-                    <span class="material-icons text-xl">check</span>
-                    <span>ยืนยัน</span>
+                    <span class="material-icons text-xl">play_arrow</span>
+                    <span>เริ่มดึงข้อมูล</span>
                 </button>
             </div>
         </form>
@@ -239,32 +409,9 @@
     let searchResults = [];
     let selectedPlaces = [];
 
-    // Load settings from localStorage
-    function loadSettings() {
-        const saved = localStorage.getItem('scraper_settings');
-        return saved ? JSON.parse(saved) : {
-            language_region: 'th',  // Default fallback
-            max_search_results: 10
-        };
-    }
-
-    // Apply settings to form
-    function applySettingsToForm() {
-        const settings = loadSettings();
-        const languageSelect = document.getElementById('language-region');
-        const maxResultsInput = document.getElementById('max-results');
-
-        if (languageSelect) {
-            languageSelect.value = settings.language_region || 'th';
-        }
-        if (maxResultsInput) {
-            maxResultsInput.value = settings.max_search_results || 10;
-        }
-    }
-
     // Apply settings when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        applySettingsToForm();
+        // Language settings are now handled in the modal, no need to apply to search form
     });
 
     // Handle search form submit
@@ -272,10 +419,20 @@
         e.preventDefault();
 
         const formData = new FormData(e.target);
+        const selectedProvince = formData.get('province');
+        const selectedLanguage = formData.get('language') || 'th';
+
+        // Build enhanced query if province is selected
+        let query = formData.get('query');
+        if (selectedProvince && query) {
+            query = `${query} จังหวัด${selectedProvince}`;
+        }
+
         const data = {
-            query: formData.get('query'),
-            max_results: parseInt(formData.get('max_results')),
-            language_region: formData.get('language_region')
+            query: query,
+            language: selectedLanguage,
+            region: selectedLanguage === 'th' ? 'th' : 'us',
+            max_results: parseInt(formData.get('max_results'))
         };
 
         // Show loading
@@ -411,13 +568,175 @@
         }
     }
 
+    // Load settings from both .env (via API) and localStorage (same as Settings page)
+    async function loadAllSettings() {
+        try {
+            // Load settings from .env file via API
+            const response = await fetch('/api/settings');
+            const envSettings = {};
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.settings) {
+                    // Map API response to our setting names
+                    Object.assign(envSettings, data.settings);
+                    console.log('🌍 Loaded from .env API in search page:', envSettings);
+                }
+            }
+
+            // Load settings from localStorage
+            const saved = localStorage.getItem('scraper_settings');
+            let localSettings = {};
+            if (saved) {
+                try {
+                    localSettings = JSON.parse(saved);
+                    console.log('📦 Loaded from localStorage in search page:', localSettings);
+                } catch (e) {
+                    console.error('❌ Failed to parse localStorage in search page:', e);
+                }
+            }
+
+            // Default settings (fallback)
+            const defaultSettings = {
+                max_search_results: 10,
+                language_region: 'en-th',
+                max_reviews: 100,
+                unlimited_reviews: false,
+                date_range: '1year',
+                start_date: null,
+                end_date: null,
+                auto_save: true,
+                show_notifications: true,
+                auto_refresh: true,
+                default_export: 'csv',
+                enable_translation: false,
+                target_language: 'th',
+                translate_review_text: true,
+                translate_owner_response: false,
+                translation_batch_size: 50,
+                use_enhanced_detection: true
+            };
+
+            // Merge: local settings as base, env settings as override (เพื่อให้ .env มีความสำคัญสูงสุด)
+            const finalSettings = { ...localSettings, ...envSettings };
+            console.log('🔀 Final merged settings in search page (with .env priority):', finalSettings);
+
+            return finalSettings;
+        } catch (error) {
+            console.error('❌ Failed to load settings from API, using localStorage only:', error);
+
+            // Fallback to localStorage only
+            const saved = localStorage.getItem('scraper_settings');
+            const defaultSettings = {
+                max_search_results: 10,
+                language_region: 'en-th',
+                max_reviews: 100,
+                unlimited_reviews: false,
+                date_range: '1year',
+                start_date: null,
+                end_date: null,
+                auto_save: true,
+                show_notifications: true,
+                auto_refresh: true,
+                default_export: 'csv',
+                enable_translation: false,
+                target_language: 'th',
+                translate_review_text: true,
+                translate_owner_response: false,
+                translation_batch_size: 50,
+                use_enhanced_detection: true
+            };
+
+            return saved ? { ...defaultSettings, ...JSON.parse(saved) } : { ...defaultSettings };
+        }
+    }
+
+    // Update modal display with all settings
+    async function updateModalWithSettings() {
+        const settings = await loadAllSettings();
+
+        // Update language settings in modal
+        document.getElementById('modal-language-region').value = settings.language_region || 'en-th';
+
+        // Update basic scraping settings (max reviews and date range)
+        const maxReviewsInput = document.getElementById('max-reviews');
+        const unlimitedCheckbox = document.getElementById('unlimited-reviews');
+        const dateRangeSelect = document.getElementById('date-range');
+
+        // Set max reviews
+        if (settings.unlimited_reviews) {
+            maxReviewsInput.value = 10000;
+            maxReviewsInput.disabled = true;
+            unlimitedCheckbox.checked = true;
+        } else {
+            maxReviewsInput.value = settings.max_reviews || 100;
+            maxReviewsInput.disabled = false;
+            unlimitedCheckbox.checked = false;
+        }
+
+        // Set date range
+        dateRangeSelect.value = settings.date_range || '1year';
+
+        // Update translation settings (using Settings page field names)
+        const translationEnabled = document.getElementById('modal-translation-enabled');
+        const translationOptions = document.getElementById('modal-translation-options');
+
+        translationEnabled.checked = settings.enable_translation || false;
+
+        if (settings.enable_translation) {
+            translationOptions.classList.remove('hidden');
+
+            // Update translation form values (using Settings page field names)
+            document.getElementById('modal-target-language').value = settings.target_language || 'th';
+            document.getElementById('modal-batch-size').value = settings.translation_batch_size || 50;
+            document.getElementById('modal-translate-review-text').checked = settings.translate_review_text !== false;
+            document.getElementById('modal-translate-owner-response').checked = settings.translate_owner_response || false;
+            document.getElementById('modal-enhanced-detection').checked = settings.use_enhanced_detection || false;
+        } else {
+            translationOptions.classList.add('hidden');
+        }
+
+        // Update summary section
+        updateSummarySection();
+    }
+
+    // Update summary section
+    function updateSummarySection() {
+        // Places count
+        document.getElementById('summary-places-count').textContent = `${selectedPlaces.length} สถานที่`;
+
+        // Translation status from modal form elements
+        const translationStatus = document.getElementById('summary-translation-status');
+        const targetLanguageDisplay = document.getElementById('summary-target-language');
+
+        if (document.getElementById('modal-translation-enabled').checked) {
+            translationStatus.textContent = 'เปิดใช้งาน';
+            translationStatus.className = 'font-semibold text-green-600';
+
+            const targetLanguage = document.getElementById('modal-target-language').value;
+            const targetLanguageMap = {
+                'th': 'ไทย',
+                'en': 'English'
+            };
+            targetLanguageDisplay.textContent = targetLanguageMap[targetLanguage] || 'ไทย';
+        } else {
+            translationStatus.textContent = 'ปิดใช้งาน';
+            translationStatus.className = 'font-semibold text-gray-500';
+            targetLanguageDisplay.textContent = '-';
+        }
+    }
+
     // Proceed to scrape - show settings modal
-    function proceedToScrape() {
+    async function proceedToScrape() {
         if (selectedPlaces.length === 0) {
             showAlert('กรุณาเลือกสถานที่อย่างน้อย 1 แห่ง', 'warning');
             return;
         }
 
+        // Load and display all settings
+        await updateModalWithSettings();
+
+        // Show modal
         document.getElementById('scrape-settings-modal').classList.remove('hidden');
     }
 
@@ -438,17 +757,47 @@
         }
     });
 
+    // Handle translation enabled toggle in modal
+    document.getElementById('modal-translation-enabled').addEventListener('change', function(e) {
+        const translationOptions = document.getElementById('modal-translation-options');
+        if (e.target.checked) {
+            translationOptions.classList.remove('hidden');
+        } else {
+            translationOptions.classList.add('hidden');
+        }
+        updateSummarySection();
+    });
+
+    // Update summary when translation settings change
+    ['modal-target-language', 'modal-translate-review-text', 'modal-translate-owner-response'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', updateSummarySection);
+        }
+    });
+
     // Handle scrape settings form submit
     document.getElementById('scrape-settings-form').addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        // Get settings from localStorage (unified language_region)
-        const settingsFromStorage = loadSettings();
         const formData = new FormData(e.target);
+
+        // Build comprehensive settings object using Settings page field names
         const settings = {
+            // Basic scraping settings
             max_reviews: document.getElementById('unlimited-reviews').checked ? null : parseInt(formData.get('max_reviews')),
             date_range: formData.get('date_range'),
-            language_region: settingsFromStorage.language_region || 'th'
+
+            // Language settings from modal (same field names as Settings page)
+            language_region: document.getElementById('modal-language-region').value,
+
+            // Translation settings from modal (same field names as Settings page)
+            enable_translation: document.getElementById('modal-translation-enabled').checked,
+            target_language: document.getElementById('modal-target-language').value,
+            translation_batch_size: parseInt(document.getElementById('modal-batch-size').value),
+            translate_review_text: document.getElementById('modal-translate-review-text').checked,
+            translate_owner_response: document.getElementById('modal-translate-owner-response').checked,
+            use_enhanced_detection: document.getElementById('modal-enhanced-detection').checked
         };
 
         const data = {
@@ -486,6 +835,260 @@
         } finally {
             hideLoading();
         }
+    });
+
+    // Thai Provinces functionality
+    let provinces = [];
+    let popularSearches = [];
+
+    // Load provinces on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadProvinces();
+        loadPopularSearches();
+        setupEventListeners();
+    });
+
+    // Load provinces from API
+    async function loadProvinces() {
+        try {
+            const response = await fetch('/api/thai-provinces');
+            const result = await response.json();
+
+            if (result.success) {
+                provinces = result.provinces;
+                populateProvinceSelect();
+            }
+        } catch (error) {
+            console.error('Failed to load provinces:', error);
+        }
+    }
+
+    // Load popular searches from API
+    async function loadPopularSearches() {
+        try {
+            const response = await fetch('/api/thai-provinces/popular-searches?limit=10');
+            const result = await response.json();
+
+            if (result.success) {
+                popularSearches = result.popular_searches;
+                displayPopularSearches();
+            }
+        } catch (error) {
+            console.error('Failed to load popular searches:', error);
+        }
+    }
+
+    // Populate province select dropdown
+    function populateProvinceSelect() {
+        const select = document.getElementById('province-select');
+
+        // Clear existing options except the first one
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+
+        // Add provinces
+        Object.keys(provinces).forEach(province => {
+            const option = document.createElement('option');
+            option.value = province;
+            option.textContent = province;
+            select.appendChild(option);
+        });
+    }
+
+    // Display popular searches
+    function displayPopularSearches() {
+        const container = document.getElementById('popular-searches');
+        container.innerHTML = '';
+
+        popularSearches.forEach(search => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700';
+            button.textContent = search.term;
+            button.onclick = () => selectPopularSearch(search);
+            container.appendChild(button);
+        });
+    }
+
+    // Select popular search
+    function selectPopularSearch(search) {
+        document.getElementById('search-query').value = search.term;
+
+        if (search.province) {
+            document.getElementById('province-select').value = search.province;
+        }
+
+        updateSearchEnhancement();
+    }
+
+    // Setup event listeners
+    function setupEventListeners() {
+        // Province select change
+        document.getElementById('province-select').addEventListener('change', updateSearchEnhancement);
+
+        // Query input change
+        document.getElementById('search-query').addEventListener('input', handleQueryInput);
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            const suggestions = document.getElementById('query-suggestions');
+            if (!document.getElementById('search-query').contains(e.target)) {
+                suggestions.classList.add('hidden');
+            }
+        });
+    }
+
+    // Handle query input with suggestions
+    async function handleQueryInput(e) {
+        const query = e.target.value;
+        const suggestionsDiv = document.getElementById('query-suggestions');
+
+        if (query.length < 2) {
+            suggestionsDiv.classList.add('hidden');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/thai-provinces/suggestions?q=${encodeURIComponent(query)}`);
+            const result = await response.json();
+
+            if (result.success && result.suggestions.length > 0) {
+                displaySuggestions(result.suggestions);
+            } else {
+                suggestionsDiv.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Failed to get suggestions:', error);
+            suggestionsDiv.classList.add('hidden');
+        }
+    }
+
+    // Display suggestions
+    function displaySuggestions(suggestions) {
+        const suggestionsDiv = document.getElementById('query-suggestions');
+        suggestionsDiv.innerHTML = '';
+
+        suggestions.forEach(suggestion => {
+            const suggestionItem = document.createElement('div');
+            suggestionItem.className = 'px-4 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0';
+
+            suggestionItem.innerHTML = `
+                <div class="font-medium">${suggestion.province}</div>
+                <div class="text-xs text-gray-500">คำค้น: ${suggestion.keywords.join(', ')}</div>
+            `;
+
+            suggestionItem.onclick = () => {
+                document.getElementById('search-query').value = suggestions[0].keywords[0];
+                document.getElementById('province-select').value = suggestion.province;
+                updateSearchEnhancement();
+                suggestionsDiv.classList.add('hidden');
+            };
+
+            suggestionsDiv.appendChild(suggestionItem);
+        });
+
+        suggestionsDiv.classList.remove('hidden');
+    }
+
+    // Update search enhancement info
+    async function updateSearchEnhancement() {
+        const query = document.getElementById('search-query').value.trim();
+        const province = document.getElementById('province-select').value;
+        const enhancementInfo = document.getElementById('search-enhancement-info');
+
+        if (!query || !province) {
+            enhancementInfo.classList.add('hidden');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/thai-provinces/validate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: query,
+                    province: province
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.valid && result.enhanced_query) {
+                document.getElementById('enhanced-province-name').textContent = result.province_data.name;
+                document.getElementById('enhanced-query-example').textContent = result.enhanced_query;
+                enhancementInfo.classList.remove('hidden');
+            } else {
+                enhancementInfo.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Failed to validate search:', error);
+            enhancementInfo.classList.add('hidden');
+        }
+    }
+
+    // Clear search function
+    function clearSearch() {
+        document.getElementById('search-query').value = '';
+        document.getElementById('province-select').value = '';
+        document.getElementById('max-results').value = '10';
+        document.getElementById('language-region').value = 'th';
+        document.getElementById('search-enhancement-info').classList.add('hidden');
+        document.getElementById('query-suggestions').classList.add('hidden');
+    }
+
+    // Initialize provinces
+    async function initializeProvinces() {
+        try {
+            const response = await fetch('/api/thai-provinces');
+            const result = await response.json();
+
+            if (result.success && result.provinces) {
+                const provinceSelect = document.getElementById('province-select');
+                provinceSelect.innerHTML = '<option value="">ค้นหาทั่วประเทศไทย</option>';
+
+                Object.entries(result.provinces).forEach(([province, data]) => {
+                    const option = document.createElement('option');
+                    option.value = province;
+                    option.textContent = province;
+                    provinceSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load provinces:', error);
+        }
+    }
+
+    // Initialize popular searches
+    async function initializePopularSearches() {
+        try {
+            const response = await fetch('/api/thai-provinces/popular-searches');
+            const result = await response.json();
+
+            if (result.success && result.searches) {
+                window.popularSearches = result.searches;
+                displayPopularSearches();
+            }
+        } catch (error) {
+            console.error('Failed to load popular searches:', error);
+        }
+    }
+
+    // Initialize everything when DOM is loaded
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Initialize provinces
+        await initializeProvinces();
+
+        // Initialize popular searches
+        await initializePopularSearches();
+
+        // Setup event listeners
+        setupEventListeners();
+
+        // Load initial settings
+        await loadAllSettings();
     });
 </script>
 {% endblock %}

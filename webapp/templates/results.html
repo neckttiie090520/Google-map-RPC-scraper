@@ -74,15 +74,6 @@
                         <option value="2">2 ดาว</option>
                         <option value="1">1 ดาว</option>
                     </select>
-
-                    <!-- Sort Order -->
-                    <select id="sort-order" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-google-blue">
-                        <option value="default">เรียวิวล่าสุด (Default)</option>
-                        <option value="newest">รีวิวใหม่ที่สุด</option>
-                        <option value="oldest">รีวิวเก่าที่สุด</option>
-                        <option value="rating-high">คะแนนสูงสุด</option>
-                        <option value="rating-low">คะแนนต่ำสุด</option>
-                    </select>
                 </div>
 
                 <div class="flex items-center space-x-2">
@@ -282,18 +273,15 @@
     function setupFilters() {
         const searchInput = document.getElementById('search-input');
         const ratingFilter = document.getElementById('rating-filter');
-        const sortOrder = document.getElementById('sort-order');
 
         searchInput.addEventListener('input', applyFilters);
         ratingFilter.addEventListener('change', applyFilters);
-        sortOrder.addEventListener('change', applyFilters);
     }
 
     // Apply filters
     function applyFilters() {
         const searchTerm = document.getElementById('search-input').value.toLowerCase();
         const ratingFilter = document.getElementById('rating-filter').value;
-        const sortOrder = document.getElementById('sort-order').value;
 
         // Filter reviews
         filteredReviews = allReviews.filter(review => {
@@ -306,29 +294,8 @@
             return matchesSearch && matchesRating;
         });
 
-        // Apply sorting
-        switch(sortOrder) {
-            case 'newest':
-                // Sort by newest date (assuming page_number represents order, 1 = newest)
-                filteredReviews.sort((a, b) => (a.page_number || 999) - (b.page_number || 999));
-                break;
-            case 'oldest':
-                // Sort by oldest date
-                filteredReviews.sort((a, b) => (b.page_number || 0) - (a.page_number || 0));
-                break;
-            case 'rating-high':
-                // Sort by rating high to low
-                filteredReviews.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-                break;
-            case 'rating-low':
-                // Sort by rating low to high
-                filteredReviews.sort((a, b) => (a.rating || 0) - (b.rating || 0));
-                break;
-            case 'default':
-            default:
-                // Default order - keep as is (already in default order from API)
-                break;
-        }
+        // Sort by newest date (page_number, 1 = newest) by default
+        filteredReviews.sort((a, b) => (a.page_number || 999) - (b.page_number || 999));
 
         currentPage = 1;
         updateReviewsDisplay();

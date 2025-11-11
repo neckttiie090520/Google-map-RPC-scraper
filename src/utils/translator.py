@@ -29,8 +29,23 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.scraper.production_scraper import ProductionReview
 from langdetect import detect, DetectorFactory
-from deep_translator import GoogleTranslator
+
 from .enhanced_language_detector import create_enhanced_detector
+
+# Import deep_translator with error handling
+try:
+    from deep_translator import GoogleTranslator
+    DEEP_TRANSLATOR_AVAILABLE = True
+except ImportError:
+    print("Warning: deep_translator not available. Install with: pip install deep-translator")
+    DEEP_TRANSLATOR_AVAILABLE = False
+    # Create dummy class for type hints
+    class GoogleTranslator:
+        def __init__(self, source='auto', target='en'):
+            self.source = source
+            self.target = target
+        def translate(self, text):
+            return text
 
 # Import bulk translator for enhanced performance
 try:
@@ -83,6 +98,14 @@ class BatchTranslator:
             self.logger.error(f"Failed to initialize enhanced detector: {e}")
             self.enhanced_detector = None
 
+            # Provide more detailed error information
+            if "lingua" in str(e).lower():
+                self.logger.error("To use enhanced detection, install: pip install lingua>=4.15.0")
+            elif "language" in str(e).lower():
+                self.logger.error("Language detection library not available")
+
+            self.logger.warning("Falling back to basic language detection (langdetect)")
+
         # Initialize translator based on availability and preference
         if self.use_bulk_translator:
             try:
@@ -104,6 +127,11 @@ class BatchTranslator:
 
     def _init_standard_translator(self):
         """Initialize standard GoogleTranslator as fallback"""
+        if not DEEP_TRANSLATOR_AVAILABLE:
+            self.logger.warning("Deep translator not available, skipping standard translator")
+            self.translator = None
+            return
+
         try:
             self.translator = GoogleTranslator(source='auto', target=self.target_language)
             self.logger.info("Standard translator initialized as fallback")
@@ -224,19 +252,50 @@ class BatchTranslator:
             # Split long text into chunks if needed (Google has limits)
             max_length = 4500  # Leave room for safety
             if len(text) <= max_length:
-                translated = self.translator.translate(text)
+                translated = self._safe_translate(text)
                 return translated
             else:
                 # For long texts, translate in chunks and combine
                 chunks = self._split_text(text, max_length)
                 translated_chunks = []
                 for chunk in chunks:
-                    translated_chunk = self.translator.translate(chunk)
+                    translated_chunk = self._safe_translate(chunk)
                     translated_chunks.append(translated_chunk)
                 return ' '.join(translated_chunks)
 
         except Exception as e:
             self.logger.error(f"Translation failed for text: {text[:100]}... - {e}")
+            return text
+
+    def _safe_translate(self, text: str) -> str:
+        """
+        Safely translate text handling googletrans edge cases
+
+        Args:
+            text: Text to translate
+
+        Returns:
+            Translated text or original text if translation fails
+        """
+        try:
+            result = self.translator.translate(text)
+
+            # Handle googletrans response properly
+            if isinstance(result, (int, float)):
+                raise Exception(f"Translation API returned error code: {result}")
+
+            # Check if result has expected attributes
+            if hasattr(result, 'text'):
+                return result.text
+            elif isinstance(result, str):
+                # Sometimes translation is returned as string directly
+                return result
+            else:
+                # Fallback: just return the result as-is
+                return str(result)
+
+        except Exception as e:
+            self.logger.debug(f"Safe translation failed: {e}")
             return text
 
     def _split_text(self, text: str, max_length: int) -> List[str]:
@@ -468,14 +527,24 @@ class BatchTranslator:
 
         return all_processed_reviews
 
+    def get_stats(self) -> TranslationStats:
+        """Get current translation statistics"""
+        return self.stats
+
+    def reset_stats(self):
+        """Reset translation statistics"""
+        self.stats = TranslationStats(target_language=self.target_language)
+
 def detect_and_translate_reviews(reviews: List[ProductionReview],
                                 target_language: str = 'th',
                                 translate_review_text: bool = True,
                                 translate_owner_response: bool = False,
                                 batch_size: int = 50,
+                                max_workers: int = 5,
+                                use_bulk_translator: bool = True,
                                 progress_callback: Optional[Callable] = None) -> List[ProductionReview]:
     """
-    Convenience function for batch language detection and translation
+    Convenience function for batch language detection and translation with enhanced performance
 
     Args:
         reviews: List of reviews to process
@@ -483,12 +552,19 @@ def detect_and_translate_reviews(reviews: List[ProductionReview],
         translate_review_text: Whether to translate review text
         translate_owner_response: Whether to translate owner response
         batch_size: Number of reviews to process in each batch
+        max_workers: Maximum concurrent workers for bulk translation
+        use_bulk_translator: Whether to use enhanced bulk translator (default: True)
         progress_callback: Optional progress callback(current, total, detected_languages)
 
     Returns:
         List of processed reviews with translations
     """
-    translator = BatchTranslator(target_language, batch_size)
+    translator = BatchTranslator(
+        target_language=target_language,
+        batch_size=batch_size,
+        use_bulk_translator=use_bulk_translator,
+        max_workers=max_workers
+    )
 
     return translator.process_all_reviews(
         reviews=reviews,

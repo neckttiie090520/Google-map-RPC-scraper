@@ -109,3 +109,5 @@ screenshots/
 .coverage
 htmlcov/
 .pytest_cache/
+
+_unused

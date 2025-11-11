@@ -849,9 +849,152 @@ Potential improvements based on project 005 roadmap:
    - Bot detection alerts
    - Performance dashboards
 
+## New Features Added (November 2025)
+
+### 1. Language-Region Management System
+
+**Files:**
+- `webapp/app.py` (lines 88-119, 413-420, 1192, 1449-1464)
+
+**Key Components:**
+
+**LANGUAGE_REGION_PRESETS Dictionary (lines 88-102):**
+```python
+LANGUAGE_REGION_PRESETS = {
+    'th': ('th', 'th'),        # Thailand locale
+    'en': ('en', 'th'),        # English language with Thailand locale
+    'en-th': ('en', 'th'),      # Explicit English-Thai combination
+    'en-us': ('en', 'us'),      # US locale
+    'ja': ('ja', 'jp'),        # Japanese
+    'zh': ('zh-CN', 'cn'),    # Chinese simplified
+    # ... 20+ total presets
+}
+```
+
+**split_language_region() Function (lines 105-119):**
+- Parses combined language-region strings (e.g., "en-th" → ('en', 'th'))
+- Supports both combined and simple language codes
+- Falls back to presets for common language codes
+
+**Enhanced Settings (line 415, 1192):**
+```python
+current_settings.update({
+    'enable_translation': False,
+    'target_language': 'en',
+    'translate_review_text': True,
+    'translate_review_metadata': False,
+    'language_region': 'th'
+})
+```
+
+**Translation Pipeline (lines 1449-1464):**
+- Queue management with retry logic
+- Multiple translation targets support
+- Error handling with exponential backoff
+- **CURRENT ISSUE**: `'float' object has no attribute 'as_dict'` error
+
+### 2. Thai Provinces Search System
+
+**Files:**
+- `src/utils/thai_provinces.py` (NEW)
+- `webapp/app.py` (lines 134-153)
+- `webapp/templates/search.html` (Enhanced)
+
+**Key Components:**
+
+**THAI_PROVINCES Dictionary:**
+- 15+ major Thai provinces with comprehensive metadata
+- Each province includes: region, search_keywords, examples, aliases
+- Supports both Thai names and English aliases
+
+**Core Functions:**
+```python
+get_all_provinces()                    # List all provinces
+get_province_data(province_name)       # Get province information
+enhance_search_query_with_province()   # Add province to search query
+get_province_suggestions(query)        # Autocomplete suggestions
+validate_province_search(query, province)  # Validate search
+get_popular_search_terms()             # Popular search combinations
+```
+
+**API Endpoints (webapp/app.py):**
+- `GET /api/provinces` - List all provinces
+- `GET /api/provinces/suggestions` - Autocomplete suggestions
+- `POST /api/provinces/validate` - Validate province search
+- Integrated with search API for province-aware results
+
+### 3. Enhanced Web Application
+
+**Files:**
+- `webapp/app.py` (Multiple enhancements)
+- `webapp/templates/search.html` (Province dropdown)
+- `webapp/templates/settings.html` (Translation settings)
+
+**New Features:**
+- Province selection dropdown with validation
+- Language-region configuration interface
+- Translation settings panel
+- Real-time search suggestions
+- Enhanced error handling and user feedback
+
+**Port Configuration:**
+- Default port changed from 5000 to 5001 to avoid conflicts
+- Multiple Flask instance detection and prevention
+
+### 4. Translation Infrastructure
+
+**Files:**
+- `src/utils/bulk_translator.py` (NEW)
+- `src/utils/enhanced_language_service.py` (NEW)
+- `src/utils/language_service.py` (NEW)
+
+**Features:**
+- Multi-provider translation support
+- Batch translation capabilities
+- Enhanced language detection
+- Retry logic with error handling
+- Translation queue management
+
+### 5. Repository Organization
+
+**Reorganization (November 2025):**
+- 54 files moved to `_unused/` directory
+- Clean main directory structure
+- Organized test files, debug scripts, and temporary data
+- Maintained essential functionality in main directory
+
+## Updated Requirements
+
+**New Dependencies (November 2025):**
+```txt
+# Translation and language detection
+py-googletrans>=4.0.0rc1
+deep-translator>=1.11.4
+lingua-language-detector>=1.2.0
+
+# Core HTTP client (updated from aiohttp)
+httpx>=0.25.2
+
+# Flask and webapp (existing)
+Flask>=2.0.0
+Werkzeug>=2.0.0
+```
+
+**Remove unused dependencies:**
+- `aiohttp` (not used in current codebase)
+- Any other unused packages
+
+## New Documentation
+
+**Created (November 2025):**
+- `docs/LANGUAGE_REGION_GUIDE.md` - Comprehensive language-region system documentation
+- `docs/THAI_PROVINCES_GUIDE.md` - Thai provinces search system documentation
+- Updated `README.md` with new features and API endpoints
+- Enhanced troubleshooting section for new features
+
 ---
 
-**Document Version:** v2.0 (Comprehensive integration of project 005 knowledge)
-**Last Updated:** 2025-11-10
+**Document Version:** v3.0 (November 2025 feature additions)
+**Last Updated:** 2025-11-11
 **Author:** Nextzus
 **Project:** google-maps-scraper-python

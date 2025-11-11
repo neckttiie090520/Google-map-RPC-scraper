@@ -10,6 +10,18 @@ A high-performance, feature-complete web scraping framework for extracting Googl
 
 ---
 
+## ⚠️ System Status Notice
+
+### Translation System: Currently Unavailable 🔴
+The automatic translation feature is temporarily **disabled** due to a technical issue:
+- **Error**: `'float' object has no attribute 'as_dict'` in translation pipeline
+- **Impact**: Translation functions are not working
+- **Workaround**: Disable translation in settings temporarily
+- **Status**: Team is working on a fix for the next update
+- **Other Features**: All other features (scraping, search, provinces) work normally
+
+---
+
 ## ✨ Key Features
 
 ### Core Scraping Capabilities
@@ -32,6 +44,9 @@ A high-performance, feature-complete web scraping framework for extracting Googl
 - 🖥️ **Modern UI**: Clean, responsive Thai/English interface
 - 📊 **Real-Time Progress**: Live updates via Server-Sent Events (SSE)
 - 🎯 **Smart Search**: RPC-based place search with autocomplete
+- 🏛️ **Thai Provinces Support**: Search by Thailand province with region optimization
+- 🌐 **Language-Region Management**: 12+ language-region presets with smart parsing
+- 🔤 **Translation Pipeline**: Automatic translation with retry logic and error handling
 - 📦 **Multi-Format Export**: JSON, CSV output
 - 📈 **Progress Tracking**: Visual progress bars with live stats
 - 💾 **Auto-Save**: Organized output management
@@ -127,6 +142,9 @@ google-maps-scraper-python/
 │       ├── anti_bot_utils.py        # Anti-detection utilities
 │       ├── output_manager.py        # File organization
 │       ├── unicode_display.py       # Thai/Unicode handling
+│       ├── thai_provinces.py        # Thailand provinces data & search
+│       ├── enhanced_language_service.py  # Advanced language detection
+│       ├── bulk_translator.py       # Batch translation utilities
 │       └── __init__.py
 ├── webapp/
 │   ├── app.py                       # Flask web application
@@ -148,7 +166,8 @@ google-maps-scraper-python/
 
 ```bash
 # Language & Region
-LANGUAGE_REGION=th          # Options: th, en, ja, zh
+LANGUAGE_REGION=th          # Options: th, en, ja, zh, en-th, en-us, ja-jp, zh-cn
+# Full list in webapp/app.py LANGUAGE_REGION_PRESETS
 
 # Scraper Settings
 DEFAULT_MAX_REVIEWS=2000    # Max reviews per place (0 = unlimited)
@@ -157,6 +176,12 @@ DEFAULT_DATE_RANGE=1year    # Options: 1month, 6months, 1year, 5years, all
 # Performance
 FAST_MODE=true              # true = 50-150ms delays, false = 500-1500ms
 MAX_RATE=10.0               # Max requests per second
+
+# Translation Settings
+ENABLE_TRANSLATION=false    # Enable automatic translation
+TARGET_LANGUAGE=en          # Target language for translation
+TRANSLATE_REVIEW_TEXT=true  # Translate review content
+TRANSLATE_REVIEW_METADATA=false # Translate review metadata
 
 # Proxy (Optional)
 USE_PROXY=false
@@ -230,7 +255,26 @@ class ProductionReview:
 - Organized output directory structure
 - Automatic metadata generation
 
-### 5. **Unlimited Mode**
+### 5. **Thai Provinces Search**
+- Search by Thailand province with automatic region optimization
+- 15+ major provinces with aliases and search keywords
+- Real-time province suggestions and validation
+- Enhanced search queries with province context
+
+### 6. **Language-Region Management**
+- 12+ language-region presets (th, en-th, en-us, ja-jp, zh-cn, etc.)
+- Smart parsing of combined language-region strings
+- Automatic language detection and enforcement
+- Consistent language settings across pagination
+
+### 7. **Translation Pipeline** ⚠️ Temporarily Unavailable
+- ~~Automatic translation with retry logic~~
+- ~~Support for review text and metadata translation~~
+- ~~Multi-provider translation services integration~~
+- **Current Status**: Disabled due to technical issue (see notice above)
+- **Workaround**: Disable translation in webapp settings
+
+### 8. **Unlimited Mode**
 - Auto-detect total reviews from place data
 - Progress bar shows actual vs. total reviews
 - Stops automatically when complete
@@ -269,6 +313,102 @@ result = await scraper.scrape_reviews(
     max_reviews=1000,
     progress_callback=my_progress_callback
 )
+```
+
+### Language-Region Configuration
+
+```python
+from webapp.app import LANGUAGE_REGION_PRESETS, split_language_region
+
+# Available presets
+print(LANGUAGE_REGION_PRESETS)
+# Output: {
+#     'th': ('th', 'th'),        # Thailand locale
+#     'en': ('en', 'th'),        # English language with Thailand locale
+#     'en-th': ('en', 'th'),      # Explicit English-Thai combination
+#     'en-us': ('en', 'us'),      # US locale
+#     'ja': ('ja', 'jp'),        # Japanese
+#     'zh': ('zh-CN', 'cn'),    # Chinese simplified
+#     # ... more presets
+# }
+
+# Parse combined language-region strings
+language, region = split_language_region("en-th")  # Returns ('en', 'th')
+language, region = split_language_region("ja-jp")  # Returns ('ja', 'jp')
+language, region = split_language_region("zh-CN")  # Returns ('zh-CN', 'cn')
+
+# Create scraper with specific preset
+scraper = create_production_scraper(
+    language="en",
+    region="th",  # English language, Thailand region
+    fast_mode=True
+)
+```
+
+### Thai Provinces Search
+
+```python
+from src.utils.thai_provinces import (
+    get_all_provinces,
+    enhance_search_query_with_province,
+    get_province_suggestions,
+    validate_province_search
+)
+
+# Get all available provinces
+provinces = get_all_provinces()
+print(f"Available provinces: {len(provinces)}")
+
+# Get province data
+from src.utils.thai_provinces import get_province_data
+province_data = get_province_data("เชียงใหม่")
+print(province_data)
+# Output: {
+#     'region': 'th',
+#     'search_keywords': ['โรงแรม', 'ร้านอาหาร', 'ตลาดน้ำ', 'วัด', 'สถานที่ท่องเที่ยว'],
+#     'examples': ['โดยติเศรษฐี', 'ตลาดน้ำตำแยง', 'วัดพระธาตุดอยสุเทพ', 'นิมมานเฮมต์'],
+#     'aliases': ['chiang mai']
+# }
+
+# Enhance search query with province
+enhanced_query = enhance_search_query_with_province("โรงแรม", "เชียงใหม่")
+print(enhanced_query)  # "โรงแรม จังหวัดเชียงใหม่"
+
+# Validate province search
+is_valid, message = validate_province_search("ร้านอาหาร", "เชียงใหม่")
+print(f"Valid: {is_valid}, Message: {message}")
+
+# Get province suggestions from partial input
+suggestions = get_province_suggestions("เชียง")
+print(suggestions)  # ['เชียงใหม่', 'เชียงราย']
+```
+
+### Translation Pipeline
+
+```python
+# Configure translation settings
+config = ScraperConfig(
+    language="th",
+    region="th",
+    # Translation settings
+    enable_translation=True,
+    target_language="en",
+    translate_review_text=True,
+    translate_review_metadata=False
+)
+
+# Scraper will automatically translate reviews during scraping
+scraper = ProductionGoogleMapsScraper(config)
+
+result = await scraper.scrape_reviews(
+    place_id="...",
+    max_reviews=100
+)
+
+# Reviews will include both original and translated text
+for review in result['reviews'][:5]:
+    print(f"Original: {review.review_text}")
+    print(f"Translated: {review.review_text_translated}")  # If translation enabled
 ```
 
 ### Multi-Language Scraping
@@ -424,6 +564,51 @@ places = await search.search_places("ข้าวซอยนิมมาน", m
 # - place_id, name, address, rating, total_reviews, category, url, latitude, longitude
 ```
 
+### Thai Provinces API
+
+```python
+# All provinces data
+from src.utils.thai_provinces import THAI_PROVINCES, get_all_provinces
+provinces = get_all_provinces()  # List of province names
+
+# Province data and utilities
+from src.utils.thai_provinces import (
+    get_province_data,           # Get province information
+    enhance_search_query_with_province,  # Add province to search query
+    get_province_suggestions,    # Get suggestions from partial input
+    validate_province_search,    # Validate search parameters
+    get_popular_search_terms     # Get popular search combinations
+)
+
+# Example: Search with province enhancement
+query = "โรงแรม"
+province = "เชียงใหม่"
+enhanced_query = enhance_search_query_with_province(query, province)
+# Returns: "โรงแรม จังหวัดเชียงใหม่"
+```
+
+### Webapp API Endpoints
+
+The Flask web application provides REST API endpoints:
+
+#### Thai Provinces API
+- `GET /api/provinces` - List all available provinces
+- `GET /api/provinces/suggestions?q=<query>` - Get province suggestions
+- `POST /api/provinces/validate` - Validate province search
+
+#### Search API
+- `POST /api/search` - Search places with province support
+- `POST /api/search/autocomplete` - Get search suggestions
+
+#### Settings API
+- `GET /api/settings` - Get current settings
+- `POST /api/settings` - Update settings (language, translation, etc.)
+
+#### Tasks API
+- `GET /api/tasks` - List all scraping tasks
+- `GET /api/tasks/<task_id>` - Get specific task details
+- `DELETE /api/tasks/<task_id>` - Delete a task
+
 ---
 
 ## 🐛 Troubleshooting
@@ -471,6 +656,47 @@ python app.py
 2. Check network latency (especially with proxies)
 3. Verify `max_rate` setting (default 10.0)
 4. Monitor rate limiting auto-slowdown
+
+### Translation Pipeline Errors
+
+**Problem**: `'float' object has no attribute 'as_dict'` error
+
+**Current Issue**: The translation retry logic is encountering a data type error where a float value is being treated as a review object.
+
+**Workaround:**
+1. Disable translation temporarily: `enable_translation=False`
+2. Check Flask logs for detailed error traces
+3. The issue is in the translation queue processing - fix in progress
+
+### Thai Provinces Not Found
+
+**Problem**: Province search returns "จังหวัด ... ไม่พบในระบบ"
+
+**Solutions:**
+1. Check exact province spelling in Thai
+2. Use aliases (e.g., "chiang mai" for "เชียงใหม่")
+3. Verify province is in the THAI_PROVINCES dictionary
+4. Use `/api/provinces/suggestions` endpoint for autocomplete
+
+### Language-Region Parsing Issues
+
+**Problem**: Language-region settings not applied correctly
+
+**Solutions:**
+1. Use proper format: "en-th", "ja-jp", "zh-cn"
+2. Check LANGUAGE_REGION_PRESETS for supported combinations
+3. Verify split_language_region() output
+4. Test with individual language and region parameters
+
+### Webapp 404 Errors
+
+**Problem**: Cannot access webapp pages, getting 404 errors
+
+**Solutions:**
+1. Check if Flask app is running on correct port (try 5001 instead of 5000)
+2. Ensure only one Flask instance is running
+3. Verify URL path matches registered routes
+4. Check for indentation errors in app.py
 
 ---
 

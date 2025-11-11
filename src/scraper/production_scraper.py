@@ -181,6 +181,8 @@ class ProductionReview:
     owner_response: str
     owner_response_translated: str  # Translated owner response
     page_number: int
+    place_id: str = ""  # Place ID where review was collected
+    place_name: str = ""  # Place name where review was collected
 
     def to_dict(self):
         """Convert to dictionary for JSON serialization"""
@@ -200,7 +202,9 @@ class ProductionReview:
             'review_photos_count': self.review_photos_count,
             'owner_response': self.owner_response,
             'owner_response_translated': self.owner_response_translated,
-            'page_number': self.page_number
+            'page_number': self.page_number,
+            'place_id': self.place_id,
+            'place_name': self.place_name
         }
 
 
@@ -1106,7 +1110,7 @@ class ProductionGoogleMapsScraper:
             safe_print(f"⚠ Failed to export PB analysis history: {e}")
             return False
 
-    def parse_review(self, entry: list, page_num: int) -> Optional[ProductionReview]:
+    def parse_review(self, entry: list, page_num: int, place_id: str = "", place_name: str = "") -> Optional[ProductionReview]:
         """
         Parse single review with complete field extraction
         Using the correct structure from working HTTP scraper
@@ -1308,7 +1312,9 @@ class ProductionGoogleMapsScraper:
                 review_photos_count=review_photos_count,
                 owner_response=owner_response,
                 owner_response_translated=owner_response_translated,
-                page_number=page_num
+                page_number=page_num,
+                place_id=place_id,
+                place_name=place_name
             )
 
         except Exception as e:
@@ -1854,7 +1860,7 @@ class ProductionGoogleMapsScraper:
             has_language_detection = any(hasattr(r, 'original_language') and r.original_language for r in reviews)
             has_response_translation = any(hasattr(r, 'owner_response_translated') and r.owner_response_translated for r in reviews)
 
-            # Build dynamic headers based on available data
+            # Build dynamic headers based on available data - matching JSON structure exactly
             headers = [
                 'Review ID', 'Author Name', 'Author URL', 'Author Reviews Count',
                 'Rating', 'Date Formatted', 'Date Relative', 'Review Text'
@@ -1871,7 +1877,8 @@ class ProductionGoogleMapsScraper:
             if has_response_translation:
                 headers.append('Translated Owner Response')
 
-            headers.extend(['Page Number'])
+            # Add place info and page number to match JSON structure
+            headers.extend(['Page Number', 'Place ID', 'Place Name'])
 
             writer.writerow(headers)
 
@@ -1900,7 +1907,10 @@ class ProductionGoogleMapsScraper:
                 if has_response_translation:
                     row.append(getattr(r, 'owner_response_translated', ''))
 
+                # Add place info and page number to match JSON structure
                 row.append(r.page_number)
+                row.append(getattr(r, 'place_id', ''))
+                row.append(getattr(r, 'place_name', ''))
 
                 writer.writerow(row)
 
