@@ -30,15 +30,47 @@ import httpx
 import csv
 import json
 import random
+import secrets
 import time
 import re
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
 # Import unicode display handler
 from src.utils.unicode_display import UnicodeDisplay, safe_print, format_name, print_review_summary
+
+# Import PB analyzer for debugging and structure analysis
+try:
+    from ..utils.pb_analyzer import GoogleMapsPBAnalyzer, PBAnalysisResult
+    PB_ANALYZER_AVAILABLE = True
+except ImportError:
+    PB_ANALYZER_AVAILABLE = False
+    GoogleMapsPBAnalyzer = None
+    PBAnalysisResult = None
+
+# Import enhanced language service for detection and translation
+try:
+    # Try enhanced language service first (with langdetect + deep-translator)
+    from ..utils.enhanced_language_service import EnhancedLanguageService, SupportedLanguage, create_enhanced_language_service
+    ENHANCED_LANGUAGE_SERVICE_AVAILABLE = True
+    print("Enhanced multi-language detection and translation available")
+except ImportError:
+    print("Warning: Enhanced language service not available. Install with: pip install langdetect deep-translator")
+    ENHANCED_LANGUAGE_SERVICE_AVAILABLE = False
+    EnhancedLanguageService = None
+
+# Fallback to basic language service
+try:
+    from ..utils.language_service import LanguageService, SupportedLanguage, create_language_service
+    LANGUAGE_SERVICE_AVAILABLE = True
+except ImportError:
+    print("Warning: Basic language service not available. Install with: pip install lingua py-googletrans")
+    LANGUAGE_SERVICE_AVAILABLE = False
+    LanguageService = None
+    SupportedLanguage = None
+    create_language_service = None
 
 # Import anti-bot utilities from our framework
 try:
@@ -141,9 +173,13 @@ class ProductionReview:
     date_formatted: str  # DD/MM/YYYY
     date_relative: str   # "2 weeks ago"
     review_text: str
+    review_text_translated: str  # Translated review text
+    original_language: str  # Detected original language
+    target_language: str  # Target language for translations
     review_likes: int
     review_photos_count: int
     owner_response: str
+    owner_response_translated: str  # Translated owner response
     page_number: int
 
     def to_dict(self):
@@ -157,9 +193,13 @@ class ProductionReview:
             'date_formatted': self.date_formatted,
             'date_relative': self.date_relative,
             'review_text': self.review_text,
+            'review_text_translated': self.review_text_translated,
+            'original_language': self.original_language,
+            'target_language': self.target_language,
             'review_likes': self.review_likes,
             'review_photos_count': self.review_photos_count,
             'owner_response': self.owner_response,
+            'owner_response_translated': self.owner_response_translated,
             'page_number': self.page_number
         }
 
@@ -180,6 +220,20 @@ class ScraperConfig:
     # Language settings
     language: str = "th"
     region: str = "th"
+
+    # Translation settings
+    enable_translation: bool = False
+    target_language: str = "en"  # "th" or "en"
+    translate_review_text: bool = True
+    translate_owner_response: bool = True
+    # Enhanced translation options
+    use_enhanced_detection: bool = True  # Use langdetect for better accuracy
+    translation_batch_size: int = 50  # Process translations in batches for performance
+
+    # Debug and analysis options
+    enable_pb_analysis: bool = False  # Enable Protocol Buffer analysis for debugging
+    pb_analysis_verbose: bool = False  # Verbose PB analysis output
+    save_pb_analysis: bool = False  # Save PB analysis results to files
 
 
 # ==================== PRODUCTION SCRAPER ====================
@@ -203,6 +257,52 @@ class ProductionGoogleMapsScraper:
         self.delay_generator = HumanLikeDelay()
         self.rate_limiter = RateLimitDetector(window_seconds=60)
 
+        # PB analyzer for debugging and structure analysis
+        self.pb_analyzer = None
+        self.pb_analysis_results = []
+        if PB_ANALYZER_AVAILABLE and config.enable_pb_analysis:
+            try:
+                self.pb_analyzer = GoogleMapsPBAnalyzer(debug_mode=config.pb_analysis_verbose)
+                safe_print(f"✓ PB Analyzer initialized (debug mode: {config.pb_analysis_verbose})")
+            except Exception as e:
+                safe_print(f"⚠ Failed to initialize PB Analyzer: {e}")
+                self.pb_analyzer = None
+
+        # Enhanced language service for detection and translation
+        self.language_service = None
+        self.translation_stats = {
+            'detected_languages': {},
+            'translated_count': 0,
+            'translation_errors': 0,
+            'detection_count': 0
+        }
+
+        if config.enable_translation:
+            # Try enhanced language service first (langdetect + deep-translator)
+            if config.use_enhanced_detection and ENHANCED_LANGUAGE_SERVICE_AVAILABLE:
+                try:
+                    self.language_service = create_enhanced_language_service(
+                        target_language=config.target_language,
+                        enable_translation=config.enable_translation
+                    )
+                    safe_print(f"✓ Enhanced multi-language service initialized (target: {config.target_language})")
+                except Exception as e:
+                    safe_print(f"⚠ Failed to initialize enhanced language service: {e}")
+                    self.language_service = None
+            # Fallback to basic language service
+            elif LANGUAGE_SERVICE_AVAILABLE:
+                try:
+                    self.language_service = create_language_service(
+                        target_language=config.target_language,
+                        enable_translation=config.enable_translation
+                    )
+                    safe_print(f"✓ Basic language service initialized (target: {config.target_language})")
+                except Exception as e:
+                    safe_print(f"⚠ Failed to initialize language service: {e}")
+                    self.language_service = None
+            else:
+                safe_print("⚠ Language service not available - install: pip install langdetect deep-translator")
+
         # Proxy rotation
         self.proxy_rotator = None
         self.current_proxy = None
@@ -221,8 +321,451 @@ class ProductionGoogleMapsScraper:
             'failed_requests': 0,
             'rate_limits_encountered': 0,
             'proxy_switches': 0,
-            'retries_used': 0
+            'retries_used': 0,
+            'session_refreshes': 0,
+            'pages_since_refresh': 0
         }
+
+        # Session identity (headers/cookies) reused across pagination to keep Google tokens stable
+        self.session_headers: Dict[str, str] = {}
+        self.session_cookies: Dict[str, str] = {}
+        self.last_refresh_time = time.time()
+        self._init_session_identity()
+
+    def _generate_session_headers(self) -> Dict[str, str]:
+        """Create stable headers for the current scraping session."""
+        headers = generate_randomized_headers(
+            language=self.config.language,
+            region=self.config.region
+        )
+        headers.update({
+            'X-Goog-AuthUser': '0',
+            'X-Goog-Visitor-Id': self.config.region,
+            'Accept-Language': f"{self.config.language}-{self.config.region.upper()},{self.config.language};q=0.9,en;q=0.8,*;q=0.5",
+            'Content-Language': self.config.language,
+            'X-Preferred-Language': self.config.language,
+            'X-Goog-Encode-Response': 'UTF-8',
+            'Accept-Charset': 'utf-8',
+            'X-Language': self.config.language,
+            'X-Region': self.config.region,
+            'X-Force-Language': 'true',
+        })
+        user_agent = headers.get('User-Agent', '')
+        if 'Googlebot' in user_agent:
+            headers['User-Agent'] = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                                     'AppleWebKit/537.36 (KHTML, like Gecko) '
+                                     'Chrome/120.0.0.0 Safari/537.36')
+        return headers
+
+    def _generate_session_cookies(self) -> Dict[str, str]:
+        """Create stable cookies for the current scraping session."""
+        session_token = secrets.token_hex(8)
+        return {
+            'CONSENT': 'YES+cb.20210401-17-p0.en+FX+700',
+            'NID': f'511=_{session_token}',
+            'SNL': f'{self.config.language}',
+            'HL': f'{self.config.language}',
+            'GL': f'{self.config.region}',
+            'LOCALE': f'{self.config.language}_{self.config.region.upper()}',
+        }
+
+    def _init_session_identity(self) -> None:
+        """Initialize headers/cookies for this scraper instance."""
+        self.session_headers = self._generate_session_headers()
+        self.session_cookies = self._generate_session_cookies()
+
+    def _refresh_session_identity(self, reason: str = "") -> None:
+        """Rotate headers/cookies when forced (e.g., rate limit)."""
+        self._init_session_identity()
+        self.last_refresh_time = time.time()
+        self.stats['session_refreshes'] += 1
+        self.stats['pages_since_refresh'] = 0
+        if reason:
+            safe_print(f"   Session identity refreshed ({reason}) - Total refreshes: {self.stats['session_refreshes']}")
+
+    def _get_session_headers(self) -> Dict[str, str]:
+        """Return copy of session headers."""
+        if not self.session_headers:
+            self._init_session_identity()
+        return self.session_headers.copy()
+
+    def _get_session_cookies(self) -> Dict[str, str]:
+        """Return copy of session cookies."""
+        if not self.session_cookies:
+            self._init_session_identity()
+        return self.session_cookies.copy()
+
+    def _should_proactively_refresh_session(self, page_num: int) -> bool:
+        """Determine if we should proactively refresh session to prevent language switching."""
+        # Refresh every 50 pages to prevent Google's session token expiration
+        if self.stats['pages_since_refresh'] >= 50:
+            return True
+
+        # Also refresh if it's been more than 30 minutes (1800 seconds)
+        current_time = time.time()
+        if current_time - self.last_refresh_time > 1800:
+            return True
+
+        return False
+
+    def _check_and_proactively_refresh_session(self, page_num: int) -> None:
+        """Check and perform proactive session refresh if needed."""
+        if self._should_proactively_refresh_session(page_num):
+            self._refresh_session_identity(reason=f"proactive refresh after {self.stats['pages_since_refresh']} pages")
+
+    def _detect_response_language_consistency(self, reviews_data: list, page_num: int) -> Tuple[bool, str]:
+        """
+        Analyze response content for language consistency.
+        Returns tuple of (is_consistent, detected_primary_language)
+        """
+        if not reviews_data or len(reviews_data) == 0:
+            return True, "empty"
+
+        # Sample first few review texts to detect language
+        sample_reviews = reviews_data[:3] if len(reviews_data) >= 3 else reviews_data
+        detected_languages = []
+
+        for review_el in sample_reviews:
+            # Check if we have the new protobuf-encoded format
+            if (len(review_el) >= 3 and
+                isinstance(review_el[2], str) and
+                review_el[2].startswith(('CAES', 'CAI', 'CNEI'))):  # Common protobuf prefixes
+
+                print(f"DEBUG: Found protobuf-encoded review: {review_el[2][:50]}...")
+                # Reviews are now encoded - cannot extract text for language detection
+                # Mark as encoded format
+                detected_languages.append('encoded')
+                continue
+
+            # Try original extraction method for backward compatibility
+            if len(review_el) > 2 and len(review_el[2]) > 15 and len(review_el[2][15]) > 0 and len(review_el[2][15][0]) > 0:
+                review_text = str(review_el[2][15][0][0])[:200]  # First 200 chars
+                print(f"DEBUG: Extracted review text: {review_text[:100]}...")
+
+                # Enhanced language detection with lower thresholds
+                thai_chars = len([c for c in review_text if 'ก' <= c <= 'ฮ' or 'ฯ' in review_text])
+                korean_chars = len([c for c in review_text if '가' <= c <= '힣'])
+                japanese_chars = len([c for c in review_text if 'あ' <= c <= 'ゟ' or 'ァ' <= c <= 'ヿ'])
+                english_chars = len([c for c in review_text if 'a' <= c.lower() <= 'z'])
+                chinese_chars = len([c for c in review_text if '\u4e00' <= c <= '\u9fff'])
+
+                # Enhanced detection with more sensitive thresholds
+                if thai_chars >= 2:  # Lowered from 5
+                    detected_languages.append('TH')
+                elif korean_chars >= 2:  # Lowered from 5
+                    detected_languages.append('KO')
+                elif chinese_chars >= 2:
+                    detected_languages.append('ZH')
+                elif japanese_chars >= 2:  # Lowered from 5
+                    detected_languages.append('JA')
+                elif english_chars >= 5:  # Lowered from 10
+                    detected_languages.append('EN')
+                else:
+                    detected_languages.append('UNKNOWN')
+
+        # Count detected languages
+        th_count = detected_languages.count('TH')
+        en_count = detected_languages.count('EN')
+        ko_count = detected_languages.count('KO')
+        ja_count = detected_languages.count('JA')
+        zh_count = detected_languages.count('ZH')
+        encoded_count = detected_languages.count('encoded')
+
+        # Determine primary language and consistency
+        primary_language = 'UNKNOWN'
+
+        # If all reviews are encoded, we can't detect language from text
+        if encoded_count == len(detected_languages):
+            primary_language = 'ENCODED_DATA'
+        else:
+            max_count = max([th_count, en_count, ko_count, ja_count, zh_count])
+
+            if max_count == 0:
+                primary_language = 'UNKNOWN'
+            elif th_count == max_count:
+                primary_language = 'TH'
+            elif en_count == max_count:
+                primary_language = 'EN'
+            elif ko_count == max_count:
+                primary_language = 'KO'
+            elif ja_count == max_count:
+                primary_language = 'JA'
+            elif zh_count == max_count:
+                primary_language = 'ZH'
+
+        # Check if response is consistent (single dominant language)
+        non_zero_counts = [count for count in [th_count, en_count, ko_count, ja_count, zh_count] if count > 0]
+        is_consistent = len(non_zero_counts) <= 1  # Only one language detected
+
+        # Log language analysis for monitoring
+        print(f"LANGUAGE ANALYSIS (Page {page_num}):")
+        print(f"  Sampled reviews: {len(sample_reviews)}")
+        print(f"  English: {en_count}, Thai: {th_count}, Korean: {ko_count}, Japanese: {ja_count}, Chinese: {zh_count}, Encoded: {encoded_count}")
+        print(f"  Primary: {primary_language}, Consistent: {is_consistent}")
+
+        return is_consistent, primary_language
+
+    def _should_refresh_based_on_language_response(self, is_consistent: bool, detected_language: str, page_num: int) -> bool:
+        """
+        Determine if session should be refreshed based on language response analysis.
+        Returns True if refresh is needed.
+        """
+        # If response is consistent, no refresh needed
+        if is_consistent:
+            return False
+
+        # If we get inconsistent languages, this might indicate session degradation
+        safe_print(f"   WARNING: Language inconsistency detected (mixed languages in response)")
+
+        # If this is after page 60 and we get mixed languages, it's likely session degradation
+        if page_num > 60:
+            safe_print(f"   CRITICAL: Language mixing after page {page_num} indicates session degradation")
+            return True
+
+        return False
+
+    def _log_session_health(self, page_num: int) -> None:
+        """Log session health statistics for monitoring."""
+        current_time = time.time()
+        session_age = current_time - self.last_refresh_time
+
+        print(f"\n=== SESSION HEALTH (Page {page_num}) ===")
+        print(f"  Session Age: {session_age:.1f}s ({session_age/60:.1f} min)")
+        print(f"  Pages Since Refresh: {self.stats['pages_since_refresh']}")
+        print(f"  Total Session Refreshes: {self.stats['session_refreshes']}")
+        print(f"  Target Language: {self.config.language}-{self.config.region}")
+        print(f"  Successful Requests: {self.stats['successful_requests']}")
+        print(f"  Rate Limits Encountered: {self.stats['rate_limits_encountered']}")
+        print(f"  Session Health: {'HEALTHY' if session_age < 1800 and self.stats['pages_since_refresh'] < 45 else 'WARNING'}")
+        print("=" * 35)
+
+    def _should_log_session_health(self, page_num: int) -> bool:
+        """Determine if we should log session health for this page."""
+        # Log every 20 pages for monitoring
+        return page_num % 20 == 1 or page_num > 60
+
+    def translate_text_field(self, text: str) -> Tuple[str, str]:
+        """
+        Translate text field and return both translated text and detected language.
+        Enhanced with multi-language detection and statistics tracking.
+
+        Args:
+            text: Text to translate
+
+        Returns:
+            Tuple of (translated_text, detected_language)
+        """
+        if not text or not text.strip():
+            return "", "unknown"
+
+        if not self.language_service:
+            return text, "unknown"
+
+        try:
+            # Update detection count
+            self.translation_stats['detection_count'] += 1
+
+            # Detect language using enhanced service
+            if ENHANCED_LANGUAGE_SERVICE_AVAILABLE and isinstance(self.language_service, EnhancedLanguageService):
+                detection = self.language_service.detect_language(text)
+                detected_lang = detection.detected_language.value
+            else:
+                detection = self.language_service.detect_language(text)
+                detected_lang = detection.detected_language.value
+
+            # Track detected languages
+            self.translation_stats['detected_languages'][detected_lang] = \
+                self.translation_stats['detected_languages'].get(detected_lang, 0) + 1
+            original_text = text
+
+            # Translate if needed
+            if detection.needs_translation:
+                self.translation_stats['translated_count'] += 1
+                translation = self.language_service.translate_text(text, detection.detected_language)
+                if translation.success:
+                    return translation.translated_text, detected_lang
+                else:
+                    # Return original if translation failed
+                    self.translation_stats['translation_errors'] += 1
+                    return original_text, detected_lang
+            else:
+                # No translation needed
+                return original_text, detected_lang
+
+        except Exception as e:
+            self.translation_stats['translation_errors'] += 1
+            safe_print(f"   Translation error: {e}")
+            return text, "unknown"
+
+    def get_translation_stats(self) -> Dict:
+        """Get translation statistics."""
+        return self.translation_stats.copy()
+
+    def reset_translation_stats(self) -> None:
+        """Reset translation statistics."""
+        self.translation_stats = {
+            'detected_languages': {},
+            'translated_count': 0,
+            'translation_errors': 0,
+            'detection_count': 0
+        }
+
+    async def translate_multiple_texts_concurrent(self, texts: List[str], max_concurrent: int = 5) -> List[Tuple[str, str]]:
+        """
+        Translate multiple texts concurrently for improved performance.
+
+        Args:
+            texts: List of texts to translate
+            max_concurrent: Maximum number of concurrent translation requests
+
+        Returns:
+            List of tuples (translated_text, detected_language)
+        """
+        if not self.language_service or not texts:
+            return [(text, "unknown") for text in texts]
+
+        async def translate_single(text: str) -> Tuple[str, str]:
+            # Use synchronous translate_text_field but run in executor
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, self.translate_text_field, text)
+
+        # Process texts in batches to control concurrency
+        results = []
+        for i in range(0, len(texts), max_concurrent):
+            batch = texts[i:i + max_concurrent]
+            batch_tasks = [translate_single(text) for text in batch]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+            # Handle exceptions and add to results
+            for j, result in enumerate(batch_results):
+                if isinstance(result, Exception):
+                    safe_print(f"   Translation error for text {i+j}: {result}")
+                    self.translation_stats['translation_errors'] += 1
+                    results.append((batch[j], "unknown"))
+                else:
+                    results.append(result)
+
+        return results
+
+    async def process_reviews_batch_concurrent(self, reviews: List[ProductionReview], max_concurrent: int = 10) -> List[ProductionReview]:
+        """
+        Process a batch of reviews with concurrent translation for maximum performance.
+
+        Args:
+            reviews: Batch of reviews to process
+            max_concurrent: Maximum concurrent operations
+
+        Returns:
+            Processed reviews with translations
+        """
+        if not reviews:
+            return []
+
+        # Collect texts to translate
+        review_texts = []
+        response_texts = []
+
+        for review in reviews:
+            if self.config.translate_review_text and review.review_text:
+                review_texts.append(review.review_text)
+            else:
+                review_texts.append(None)
+
+            if self.config.translate_owner_response and review.owner_response:
+                response_texts.append(review.owner_response)
+            else:
+                response_texts.append(None)
+
+        # Process reviews and responses concurrently
+        tasks = []
+
+        # Translate review texts concurrently
+        if any(review_texts):
+            texts_to_translate = [text for text in review_texts if text]
+            if texts_to_translate:
+                tasks.append(self.translate_multiple_texts_concurrent(texts_to_translate, max_concurrent))
+
+        # Translate response texts concurrently
+        if any(response_texts):
+            texts_to_translate = [text for text in response_texts if text]
+            if texts_to_translate:
+                tasks.append(self.translate_multiple_texts_concurrent(texts_to_translate, max_concurrent))
+
+        # Detect languages for texts that don't need translation
+        async def detect_language_concurrent(texts: List[str]) -> List[str]:
+            if not self.language_service or not texts:
+                return ["unknown"] * len(texts)
+
+            loop = asyncio.get_event_loop()
+            detect_tasks = []
+
+            for text in texts:
+                if text:
+                    # Use synchronous detection in executor
+                    if ENHANCED_LANGUAGE_SERVICE_AVAILABLE and isinstance(self.language_service, EnhancedLanguageService):
+                        task = loop.run_in_executor(
+                            None,
+                            lambda t=text: self.language_service.detect_language(t).detected_language.value
+                        )
+                    else:
+                        task = loop.run_in_executor(
+                            None,
+                            lambda t=text: self.language_service.detect_language(t).detected_language.value
+                        )
+                    detect_tasks.append(task)
+                else:
+                    detect_tasks.append(asyncio.create_task(asyncio.sleep(0)))  # Placeholder
+
+            results = await asyncio.gather(*detect_tasks, return_exceptions=True)
+            return [result if not isinstance(result, Exception) else "unknown" for result in results]
+
+        # Detect languages for non-translated texts
+        review_texts_to_detect = [text for text in review_texts if text and not self.config.translate_review_text]
+        response_texts_to_detect = [text for text in response_texts if text and not self.config.translate_owner_response]
+
+        if review_texts_to_detect:
+            tasks.append(detect_language_concurrent(review_texts_to_detect))
+        if response_texts_to_detect:
+            tasks.append(detect_language_concurrent(response_texts_to_detect))
+
+        # Wait for all concurrent tasks to complete
+        task_results = await asyncio.gather(*tasks, return_exceptions=True) if tasks else []
+
+        # Process results and update reviews
+        review_text_index = 0
+        response_text_index = 0
+
+        for i, review in enumerate(reviews):
+            # Handle review text translation/detection
+            if review_texts[i]:
+                if self.config.translate_review_text:
+                    # Translation was done
+                    if task_results and len(task_results) > 0 and review_text_index < len(task_results[0]):
+                        translated_text, detected_lang = task_results[0][review_text_index]
+                        review.review_text_translated = translated_text
+                        review.original_language = detected_lang
+                        review.target_language = self.config.target_language
+                        review_text_index += 1
+                else:
+                    # Only detection was done
+                    detection_result_index = (1 if task_results and len(task_results) > 0 and any(review_texts) else 0)
+                    if review_texts_to_detect and len(task_results) > detection_result_index and review_text_index < len(task_results[detection_result_index]):
+                        detected_lang = task_results[detection_result_index][review_text_index]
+                        review.original_language = detected_lang
+                        review.target_language = self.config.target_language
+                        review_text_index += 1
+
+            # Handle response text translation/detection
+            if response_texts[i]:
+                if self.config.translate_owner_response:
+                    # Translation was done
+                    translation_result_index = (1 if any(review_texts) else 0)
+                    if len(task_results) > translation_result_index and response_text_index < len(task_results[translation_result_index]):
+                        translated_response, _ = task_results[translation_result_index][response_text_index]
+                        review.owner_response_translated = translated_response
+                        response_text_index += 1
+
+        return reviews
 
     def calculate_date_cutoff(self, date_range: str) -> Optional[datetime]:
         """
@@ -396,6 +939,172 @@ class ProductionGoogleMapsScraper:
         except Exception as e:
             return relative_date
 
+    # ==================== PROTOCOL BUFFER ANALYSIS ====================
+
+    def analyze_response_with_pb_analyzer(self, response_data: Any, analysis_type: str = "reviews") -> Optional[PBAnalysisResult]:
+        """
+        Analyze response data using PB analyzer for debugging
+
+        Args:
+            response_data: Raw response data from Google Maps API
+            analysis_type: Type of analysis (reviews, places, general)
+
+        Returns:
+            PBAnalysisResult or None if analyzer not available
+        """
+        if not self.pb_analyzer:
+            return None
+
+        try:
+            result = self.pb_analyzer.analyze_response_structure(response_data, analysis_type)
+            self.pb_analysis_results.append(result)
+
+            if self.config.pb_analysis_verbose:
+                self.pb_analyzer.print_analysis_report(result, verbose=True)
+
+            # Save analysis if configured
+            if self.config.save_pb_analysis:
+                self._save_pb_analysis_result(result, analysis_type)
+
+            return result
+
+        except Exception as e:
+            safe_print(f"⚠ PB analysis failed: {e}")
+            return None
+
+    def analyze_pb_parameters(self, pb_string: str) -> Optional[PBAnalysisResult]:
+        """
+        Analyze Protocol Buffer parameters
+
+        Args:
+            pb_string: Protocol Buffer parameter string
+
+        Returns:
+            PBAnalysisResult or None if analyzer not available
+        """
+        if not self.pb_analyzer:
+            return None
+
+        try:
+            result = self.pb_analyzer.analyze_pb_parameters(pb_string)
+            self.pb_analysis_results.append(result)
+
+            if self.config.pb_analysis_verbose:
+                safe_print(f"📋 PB Parameter Analysis:")
+                safe_print(f"   Original: {pb_string}")
+                if result.success:
+                    safe_print(f"   Place ID: {result.data.get('place_id_extracted', 'N/A')}")
+                    safe_print(f"   Components: {len(result.data.get('components', []))}")
+                else:
+                    safe_print(f"   Error: {result.data.get('error', 'Unknown')}")
+
+            return result
+
+        except Exception as e:
+            safe_print(f"⚠ PB parameter analysis failed: {e}")
+            return None
+
+    def validate_review_with_pb_analyzer(self, review_data: Any, expected_fields: List[str] = None) -> Optional[PBAnalysisResult]:
+        """
+        Validate review parsing using PB analyzer
+
+        Args:
+            review_data: Parsed review data
+            expected_fields: List of expected field names
+
+        Returns:
+            PBAnalysisResult or None if analyzer not available
+        """
+        if not self.pb_analyzer:
+            return None
+
+        try:
+            result = self.pb_analyzer.validate_review_parsing(review_data, expected_fields)
+
+            if self.config.pb_analysis_verbose:
+                safe_print(f"🔍 Review Validation:")
+                safe_print(f"   Field coverage: {result.data.get('field_coverage', 0):.1%}")
+                safe_print(f"   Found fields: {len(result.data.get('found_fields', []))}")
+                safe_print(f"   Missing fields: {result.data.get('missing_fields', [])}")
+
+            return result
+
+        except Exception as e:
+            safe_print(f"⚠ Review validation failed: {e}")
+            return None
+
+    def _save_pb_analysis_result(self, result: PBAnalysisResult, analysis_type: str):
+        """Save PB analysis result to file"""
+        try:
+            from datetime import datetime
+            import json
+            from pathlib import Path
+
+            # Create pb_analysis directory
+            pb_dir = Path("pb_analysis")
+            pb_dir.mkdir(exist_ok=True)
+
+            # Generate filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{analysis_type}_analysis_{timestamp}.json"
+            filepath = pb_dir / filename
+
+            # Save result
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(result.__dict__, f, ensure_ascii=False, indent=2, default=str)
+
+            safe_print(f"✓ PB analysis saved: {filepath}")
+
+        except Exception as e:
+            safe_print(f"⚠ Failed to save PB analysis: {e}")
+
+    def get_pb_analysis_summary(self) -> Dict[str, Any]:
+        """Get summary of all PB analysis results"""
+        if not self.pb_analysis_results:
+            return {"total_analyses": 0, "summary": "No PB analyses performed"}
+
+        summary = {
+            "total_analyses": len(self.pb_analysis_results),
+            "successful_analyses": sum(1 for r in self.pb_analysis_results if r.success),
+            "analysis_types": {},
+            "common_warnings": [],
+            "common_recommendations": []
+        }
+
+        # Count analysis types
+        for result in self.pb_analysis_results:
+            analysis_type = result.analysis_type
+            summary["analysis_types"][analysis_type] = summary["analysis_types"].get(analysis_type, 0) + 1
+
+            # Collect common warnings
+            for warning in result.warnings:
+                if warning not in summary["common_warnings"]:
+                    summary["common_warnings"].append(warning)
+
+            # Collect common recommendations
+            for rec in result.recommendations:
+                if rec not in summary["common_recommendations"]:
+                    summary["common_recommendations"].append(rec)
+
+        return summary
+
+    def export_pb_analysis_history(self, filename: str = None) -> bool:
+        """Export PB analysis history to file"""
+        if not self.pb_analyzer or not self.pb_analysis_results:
+            safe_print("⚠ No PB analysis results to export")
+            return False
+
+        try:
+            if filename is None:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"pb_analysis_history_{timestamp}.json"
+
+            return self.pb_analyzer.export_analysis_history(filename)
+
+        except Exception as e:
+            safe_print(f"⚠ Failed to export PB analysis history: {e}")
+            return False
 
     def parse_review(self, entry: list, page_num: int) -> Optional[ProductionReview]:
         """
@@ -413,8 +1122,22 @@ class ProductionGoogleMapsScraper:
             if not isinstance(el, list):
                 return None
 
+            # PB Analysis: Validate review structure if analyzer is enabled
+            if self.pb_analyzer and self.config.pb_analysis_verbose and page_num == 1:
+                # Validate first review structure for debugging
+                validation_result = self.validate_review_with_pb_analyzer(el)
+                if validation_result and not validation_result.success:
+                    safe_print(f"⚠ Review structure validation failed: {validation_result.data.get('error')}")
+
             # Review ID: el[0]
             review_id = self.safe_get(el, 0) or ""
+
+            # Check if review_id is the new encoded format
+            if (isinstance(review_id, str) and
+                review_id.startswith(('CAES', 'CAI', 'CNEI'))):
+                # Generate a proper ID for encoded reviews
+                review_id = f"encoded_review_{page_num}_{review_idx}"
+
             if not review_id:
                 return None
 
@@ -438,11 +1161,22 @@ class ProductionGoogleMapsScraper:
             else:
                 rating = 0
 
-            # Review text: el[2][15][0][0] with cleaning
-            review_text = self.safe_get(el, 2, 15, 0, 0) or ""
-            # Clean up text: remove newlines and extra whitespace
-            review_text = re.sub(r'\n+', ' ', str(review_text)).strip()
-            review_text = re.sub(r'\s+', ' ', review_text)  # Normalize whitespace
+            # Review text: Check if we have the new encoded format
+            raw_review_data = self.safe_get(el, 2)
+            if (isinstance(raw_review_data, str) and
+                raw_review_data.startswith(('CAES', 'CAI', 'CNEI'))):  # Protobuf prefixes
+
+                # New protobuf-encoded format - cannot extract text without decoder
+                review_text = "[ENCODED_DATA - Requires protobuf decoder]"
+                # Note: review_id is probably also the encoded data, not a real ID
+                if not review_id or review_id == raw_review_data:
+                    review_id = f"encoded_review_{page_num}_{review_idx}"
+            else:
+                # Original format: el[2][15][0][0] with cleaning
+                review_text = self.safe_get(el, 2, 15, 0, 0) or ""
+                # Clean up text: remove newlines and extra whitespace
+                review_text = re.sub(r'\n+', ' ', str(review_text)).strip()
+                review_text = re.sub(r'\s+', ' ', review_text)  # Normalize whitespace
 
             # Date extraction with multiple fallback strategies (from project 005)
             date_formatted = ""
@@ -538,6 +1272,26 @@ class ProductionGoogleMapsScraper:
             # Owner response: el[2][19][0][1]
             owner_response = self.safe_get(el, 2, 19, 0, 1) or ""
 
+            # Language processing
+            original_language = "unknown"
+            target_language = self.config.target_language if self.config.enable_translation else "none"
+            review_text_translated = review_text
+            owner_response_translated = owner_response
+
+            if self.language_service:
+                # Process review text
+                if self.config.translate_review_text and review_text:
+                    review_text_translated, original_language = self.translate_text_field(review_text)
+                elif review_text:
+                    # Just detect language without translation
+                    detection = self.language_service.detect_language(review_text)
+                    original_language = detection.detected_language.value
+
+                # Process owner response
+                if self.config.translate_owner_response and owner_response:
+                    owner_response_translated, _ = self.translate_text_field(owner_response)
+                # Note: owner response inherits the same original_language as review text
+
             return ProductionReview(
                 review_id=review_id,
                 author_name=author_name,
@@ -547,9 +1301,13 @@ class ProductionGoogleMapsScraper:
                 date_formatted=date_formatted,
                 date_relative=date_relative,
                 review_text=review_text,
+                review_text_translated=review_text_translated,
+                original_language=original_language,
+                target_language=target_language,
                 review_likes=review_likes,
                 review_photos_count=review_photos_count,
                 owner_response=owner_response,
+                owner_response_translated=owner_response_translated,
                 page_number=page_num
             )
 
@@ -579,19 +1337,18 @@ class ProductionGoogleMapsScraper:
         delay = self.delay_generator.random_page_delay(fast_mode=self.config.fast_mode)
         await asyncio.sleep(delay)
 
-        # Build RPC URL with stronger language enforcement
-        # Adding multiple language parameters to prevent Google's adaptive switching
+        # Check and perform proactive session refresh to prevent language switching
+        self._check_and_proactively_refresh_session(page_num)
+
+        # Build RPC URL with STRONG language enforcement (working parameters)
         rpc_url = (f"https://www.google.com/maps/rpc/listugcposts?"
                   f"authuser=0"
                   f"&hl={self.config.language}"
                   f"&gl={self.config.region}"
-                  f"&tbm=lcl"
-                  f"&force_lang={self.config.language}"  # Force language parameter
-                  f"&disable_auto_translate=1"          # Disable auto translation
-                  f"&pref_lang={self.config.language}")  # Preference language
+                  f"&tbm=lcl")
 
         # Build pb parameter with language-specific components
-        # Note: Embedding language hints in pb parameter for better consistency across pages
+        # Critical: Include language enforcement directly in pb parameter structure
         pb_param = f"!1m6!1s{place_id}!6m4!4m1!1e1!4m1!1e3!2m2!1i20!2s"
 
         if page_token:
@@ -599,38 +1356,60 @@ class ProductionGoogleMapsScraper:
         else:
             pb_param += ""
 
-        # Use the proven working pb parameter from project 005 for consistency
-        # This specific value appears to be required for stable API behavior
-        pb_param += "!5m2!1sHJ8QacelO62QseMP2dTGqQQ!7e81!8m9!2b1!3b1!5b1!7b1!12m4!1b1!2b1!4m1!1e1!11m4!1e3!2e1!6m1!1i2!13m1!1e1"
+        # Enhanced pb parameter with STRONG language consistency components
+        region_code = self.config.region.lower()
+        language_key = self.config.language.lower()
+        sanitized_lang = language_key.replace('-', '')
+        lang_markers = {
+            'en': f"!4m2!1sen!2s{region_code}",
+            'th': f"!4m2!1sth!2s{region_code}",
+            'ja': f"!4m2!1sja!2s{region_code}",
+            'zh-cn': f"!4m2!1szh!2s{region_code}",
+        }
+
+        lang_marker = lang_markers.get(language_key, f"!4m2!1s{sanitized_lang}!2s{region_code}")
+
+        # Complete pb parameter with STRONG language enforcement
+        pb_param += f"{lang_marker}!5m2!1sHJ8QacelO62QseMP2dTGqQQ!7e81!8m9!2b1!3b1!5b1!7b1!12m4!1b1!2b1!4m1!1e1!11m4!1e3!2e1!6m1!1i2!13m1!1e1"
 
         rpc_url += f"&pb={quote(pb_param)}"
+
+        # DEBUG: Log RPC request details for language analysis
+        print(f"\n=== RPC REQUEST DEBUG (Page {page_num}) ===")
+        print(f"Target Language: {self.config.language}-{self.config.region}")
+        print(f"Language Marker: {lang_marker}")
+        print(f"Has Page Token: {'Yes' if page_token else 'No'}")
+        print(f"Full RPC URL: {rpc_url[:200]}...")
+        print(f"PB Parameter Language Section: {pb_param}")
+        print("=" * 50)
 
         # Retry logic with exponential backoff
         for attempt in range(self.config.max_retries):
             try:
-                # Generate randomized headers with strong language enforcement
-                headers = generate_randomized_headers(
-                    language=self.config.language,
-                    region=self.config.region
-                )
+                # Generate consistent headers with maximum language enforcement
+                headers = self._get_session_headers()
 
-                # Add stronger language enforcement headers
-                headers.update({
-                    'X-Goog-AuthUser': '0',
-                    'X-Goog-Visitor-Id': self.config.region,
-                    'Accept-Language': f"{self.config.language}-{self.config.region.upper()},{self.config.language};q=0.9",
-                    'Content-Language': self.config.language,
-                    'X-Preferred-Language': self.config.language,
-                })
+                # DEBUG: Log language-related headers
+                print(f"LANGUAGE ENFORCEMENT HEADERS:")
+                print(f"  Accept-Language: {headers.get('Accept-Language', 'Not set')}")
+                print(f"  Content-Language: {headers.get('Content-Language', 'Not set')}")
+                print(f"  X-Preferred-Language: {headers.get('X-Preferred-Language', 'Not set')}")
+                print(f"  X-Goog-Visitor-Id: {headers.get('X-Goog-Visitor-Id', 'Not set')}")
+                print(f"  User-Agent: {headers.get('User-Agent', 'Not set')[:80]}...")
+                print("-" * 30)
 
                 # Record request
                 self.rate_limiter.record_request()
                 self.stats['total_requests'] += 1
 
-                # Make request
+                # Add session cookies for language enforcement
+                cookies = self._get_session_cookies()
+
+                # Make request with language cookies
                 response = await client.get(
                     rpc_url,
                     headers=headers,
+                    cookies=cookies,
                     timeout=self.config.timeout
                 )
 
@@ -644,8 +1423,24 @@ class ProductionGoogleMapsScraper:
                         data = json.loads(raw_data)
                         reviews_data = self.safe_get(data, 2)
 
+                        # PB Analysis: Analyze response structure for debugging (first page only)
+                        if self.pb_analyzer and page_num == 1:
+                            self.analyze_response_with_pb_analyzer(data, "reviews")
+
                         # Extract next page token from data[1]
                         next_page_token = data[1] if len(data) > 1 and isinstance(data[1], str) else None
+
+                        # LANGUAGE CONSISTENCY VALIDATION (Actionable detection and response)
+                        if reviews_data and len(reviews_data) > 0:
+                            # Analyze response language consistency
+                            is_consistent, primary_language = self._detect_response_language_consistency(reviews_data, page_num)
+
+                            # Check if we need to refresh session based on language response
+                            if self._should_refresh_based_on_language_response(is_consistent, primary_language, page_num):
+                                self._refresh_session_identity(reason=f"language inconsistency detected (primary: {primary_language})")
+                                # Re-request the page with fresh session
+                                safe_print(f"   Re-requesting page {page_num} with fresh session...")
+                                continue  # Retry with new session
 
                         if not reviews_data:
                             self.stats['successful_requests'] += 1
@@ -659,6 +1454,12 @@ class ProductionGoogleMapsScraper:
                                 reviews.append(review)
 
                         self.stats['successful_requests'] += 1
+                        self.stats['pages_since_refresh'] += 1
+
+                        # Log session health for monitoring
+                        if self._should_log_session_health(page_num):
+                            self._log_session_health(page_num)
+
                         return reviews, next_page_token
 
                     except json.JSONDecodeError as e:
@@ -680,6 +1481,9 @@ class ProductionGoogleMapsScraper:
                         self.stats['proxy_switches'] += 1
                         safe_print(f"   Switched proxy")
 
+                    # Refresh headers/cookies to keep pagination tokens valid
+                    self._refresh_session_identity(reason="rate_limit")
+
                     self.stats['retries_used'] += 1
                     continue
 
@@ -688,6 +1492,7 @@ class ProductionGoogleMapsScraper:
                     backoff_time = (2 ** attempt) * 2
                     safe_print(f"   Server error {response.status_code} on page {page_num}, waiting {backoff_time}s")
                     await asyncio.sleep(backoff_time)
+                    self._refresh_session_identity(reason="server_error")
                     self.stats['retries_used'] += 1
                     continue
 
@@ -697,7 +1502,7 @@ class ProductionGoogleMapsScraper:
                     self.stats['failed_requests'] += 1
                     return None, None
 
-            except httpx.TimeoutException:
+            except httpx.TimeoutError:
                 backoff_time = (2 ** attempt) * 1
                 safe_print(f"   Timeout on page {page_num}, waiting {backoff_time}s")
                 await asyncio.sleep(backoff_time)
@@ -770,15 +1575,17 @@ class ProductionGoogleMapsScraper:
         seen_review_ids = set()  # Track seen reviews to prevent duplicates
 
         # Setup HTTP client with proxy if enabled
+        # Set consistent headers that will be merged with request-specific headers
         client_kwargs = {
-            "limits": httpx.Limits(max_connections=10, max_keepalive_connections=5),
             "timeout": self.config.timeout,
             "headers": {
                 "Accept-Language": f"{self.config.language}-{self.config.region.upper()},{self.config.language};q=0.9,en;q=0.8",
                 "Accept": "application/json, text/plain, */*",
                 "Accept-Encoding": "gzip, deflate, br",
                 "Cache-Control": "no-cache",
-                "Pragma": "no-cache"
+                "Pragma": "no-cache",
+                "Accept-Charset": "utf-8",
+                "Content-Type": "application/json; charset=utf-8"
             }
         }
 
@@ -897,6 +1704,47 @@ class ProductionGoogleMapsScraper:
             all_reviews.sort(key=get_sort_key, reverse=True)
             safe_print(f"   Sorted {len(all_reviews)} reviews by date")
 
+            # Process translations if enabled (concurrent batch processing for maximum performance)
+            if self.config.enable_translation and self.language_service:
+                safe_print("Processing translations with concurrent processing...")
+                translation_start = time.time()
+                self.reset_translation_stats()
+
+                # Process reviews in batches with concurrent translation for maximum performance
+                batch_size = self.config.translation_batch_size
+                total_reviews = len(all_reviews)
+
+                for i in range(0, total_reviews, batch_size):
+                    batch_end = min(i + batch_size, total_reviews)
+                    batch_reviews = all_reviews[i:batch_end]
+
+                    # Process this batch with concurrent translation
+                    processed_reviews = await self.process_reviews_batch_concurrent(batch_reviews, max_concurrent=min(10, batch_size))
+
+                    # Update the original reviews with processed data
+                    for j, review in enumerate(processed_reviews):
+                        if j < len(batch_reviews):
+                            batch_reviews[j] = review
+
+                    # Update progress callback with translation progress
+                    if progress_callback:
+                        progress = (batch_end / total_reviews) * 100
+                        stats = self.get_translation_stats()
+                        progress_callback(
+                            page_num=i // batch_size + 1,
+                            total_reviews=batch_end,
+                            translation_progress=f"{progress:.1f}%",
+                            detected_languages=stats['detected_languages'],
+                            translated_count=stats['translated_count']
+                        )
+
+                translation_time = time.time() - translation_start
+                stats = self.get_translation_stats()
+                safe_print(f"   Concurrent translation completed in {translation_time:.2f}s")
+                safe_print(f"   Detected languages: {dict(stats['detected_languages'])}")
+                safe_print(f"   Reviews translated: {stats['translated_count']}")
+                safe_print(f"   Translation errors: {stats['translation_errors']}")
+
         # Print stats
         print()
         safe_print("=" * 80)
@@ -945,36 +1793,116 @@ class ProductionGoogleMapsScraper:
         except Exception as e:
             safe_print(f"[WARNING] Could not save reviews to output manager: {e}")
 
+        # Prepare enhanced metadata with translation analytics
+        metadata = {
+            'place_id': place_id,
+            'total_reviews': len(all_reviews),
+            'time_taken': elapsed,
+            'rate': rate,
+            'language': self.config.language,
+            'region': self.config.region,
+            'date_range': date_range,
+            'sort_by_newest': sort_by_newest,
+            'date_cutoff': date_cutoff.strftime('%d/%m/%Y') if date_cutoff else None,
+            'stats': self.stats
+        }
+
+        # Add translation statistics if translation was enabled
+        if self.config.enable_translation and self.language_service:
+            translation_stats = self.get_translation_stats()
+            metadata['translation'] = {
+                'enabled': True,
+                'target_language': self.config.target_language,
+                'translate_review_text': self.config.translate_review_text,
+                'translate_owner_response': self.config.translate_owner_response,
+                'detection_count': translation_stats.get('detection_count', 0),
+                'translated_count': translation_stats.get('translated_count', 0),
+                'translation_errors': translation_stats.get('translation_errors', 0),
+                'detected_languages': translation_stats.get('detected_languages', {}),
+                'language_distribution': {
+                    'total_analyzed': translation_stats.get('detection_count', 0),
+                    'unique_languages': len(translation_stats.get('detected_languages', {})),
+                    'languages_found': dict(sorted(
+                        translation_stats.get('detected_languages', {}).items(),
+                        key=lambda x: x[1],
+                        reverse=True
+                    ))
+                },
+                'translation_success_rate': (
+                    (translation_stats.get('translated_count', 0) /
+                     max(1, translation_stats.get('detection_count', 0))) * 100
+                )
+            }
+        else:
+            metadata['translation'] = {
+                'enabled': False,
+                'reason': 'Translation disabled in configuration'
+            }
+
         return {
             'reviews': all_reviews,
-            'metadata': {
-                'place_id': place_id,
-                'total_reviews': len(all_reviews),
-                'time_taken': elapsed,
-                'rate': rate,
-                'language': self.config.language,
-                'region': self.config.region,
-                'date_range': date_range,
-                'sort_by_newest': sort_by_newest,
-                'date_cutoff': date_cutoff.strftime('%d/%m/%Y') if date_cutoff else None,
-                'stats': self.stats
-            }
+            'metadata': metadata
         }
 
     def export_to_csv(self, reviews: List[ProductionReview], filename: str):
-        """Export reviews to CSV"""
+        """Export reviews to CSV with support for translated content"""
         with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
-            writer.writerow([
-                'Review ID', 'Author Name', 'Author URL',
-                'Rating', 'Date Formatted', 'Date Relative', 'Review Text', 'Page Number'
-            ])
 
+            # Check if any reviews have translation data and set headers accordingly
+            has_translations = any(hasattr(r, 'review_text_translated') and r.review_text_translated for r in reviews)
+            has_language_detection = any(hasattr(r, 'original_language') and r.original_language for r in reviews)
+            has_response_translation = any(hasattr(r, 'owner_response_translated') and r.owner_response_translated for r in reviews)
+
+            # Build dynamic headers based on available data
+            headers = [
+                'Review ID', 'Author Name', 'Author URL', 'Author Reviews Count',
+                'Rating', 'Date Formatted', 'Date Relative', 'Review Text'
+            ]
+
+            if has_language_detection:
+                headers.extend(['Original Language', 'Target Language'])
+
+            if has_translations:
+                headers.append('Translated Review Text')
+
+            headers.extend(['Review Likes', 'Review Photos Count', 'Owner Response'])
+
+            if has_response_translation:
+                headers.append('Translated Owner Response')
+
+            headers.extend(['Page Number'])
+
+            writer.writerow(headers)
+
+            # Write data rows
             for r in reviews:
-                writer.writerow([
-                    r.review_id, r.author_name, r.author_url,
-                    r.rating, r.date_formatted, r.date_relative, r.review_text, r.page_number
+                row = [
+                    r.review_id, r.author_name, r.author_url, getattr(r, 'author_reviews_count', 0),
+                    r.rating, r.date_formatted, r.date_relative, r.review_text
+                ]
+
+                if has_language_detection:
+                    row.extend([
+                        getattr(r, 'original_language', ''),
+                        getattr(r, 'target_language', '')
+                    ])
+
+                if has_translations:
+                    row.append(getattr(r, 'review_text_translated', ''))
+
+                row.extend([
+                    getattr(r, 'review_likes', 0),
+                    getattr(r, 'review_photos_count', 0),
+                    getattr(r, 'owner_response', '')
                 ])
+
+                if has_response_translation:
+                    row.append(getattr(r, 'owner_response_translated', ''))
+
+                row.append(r.page_number)
+
+                writer.writerow(row)
 
         safe_print(f"Exported to CSV: {filename}")
 
@@ -1002,7 +1930,18 @@ def create_production_scraper(
     use_proxy: bool = False,
     proxy_list: Optional[List[str]] = None,
     timeout: float = 30.0,
-    max_retries: int = 3
+    max_retries: int = 3,
+    enable_translation: bool = False,
+    target_language: str = "en",
+    translate_review_text: bool = True,
+    translate_owner_response: bool = True,
+    # Enhanced translation settings
+    use_enhanced_detection: bool = True,
+    translation_batch_size: int = 50,
+    # Debug and analysis options
+    enable_pb_analysis: bool = False,
+    pb_analysis_verbose: bool = False,
+    save_pb_analysis: bool = False
 ) -> ProductionGoogleMapsScraper:
     """
     Factory function to create configured production scraper
@@ -1016,6 +1955,10 @@ def create_production_scraper(
         proxy_list: List of proxy URLs
         timeout: Request timeout in seconds
         max_retries: Maximum retry attempts
+        enable_translation: Enable language detection and translation
+        target_language: Target language for translation ("th" or "en")
+        translate_review_text: Translate review text if needed
+        translate_owner_response: Translate owner response if needed
 
     Returns:
         Configured ProductionGoogleMapsScraper instance
@@ -1028,7 +1971,18 @@ def create_production_scraper(
         use_proxy=use_proxy,
         proxy_list=proxy_list,
         timeout=timeout,
-        max_retries=max_retries
+        max_retries=max_retries,
+        enable_translation=enable_translation,
+        target_language=target_language,
+        translate_review_text=translate_review_text,
+        translate_owner_response=translate_owner_response,
+        # Enhanced translation settings
+        use_enhanced_detection=use_enhanced_detection,
+        translation_batch_size=translation_batch_size,
+        # Debug and analysis options
+        enable_pb_analysis=enable_pb_analysis,
+        pb_analysis_verbose=pb_analysis_verbose,
+        save_pb_analysis=save_pb_analysis
     )
 
     return ProductionGoogleMapsScraper(config)

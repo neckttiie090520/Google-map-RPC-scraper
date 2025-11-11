@@ -357,6 +357,75 @@ async def example_7_error_handling():
     return valid_result
 
 
+async def example_8_pb_analysis():
+    """
+    Example 8: Protocol Buffer Analysis for Debugging
+    """
+    safe_print("\n" + "=" * 80)
+    safe_print("EXAMPLE 8: Protocol Buffer Analysis (Debugging)")
+    safe_print("=" * 80)
+
+    # Create scraper with PB analysis enabled
+    scraper = create_production_scraper(
+        language="th",
+        region="th",
+        fast_mode=True,
+        enable_pb_analysis=True,      # Enable PB analyzer
+        pb_analysis_verbose=True,     # Verbose PB output
+        save_pb_analysis=True        # Save analysis results
+    )
+
+    safe_print("PB Analysis features enabled:")
+    safe_print("  - Response structure analysis")
+    safe_print("  - Field mapping validation")
+    safe_print("  - Change detection")
+    safe_print("  - Debug output enabled")
+
+    place_id = "0x30e29ecfc2f455e1:0xc4ad0280d8906604"
+
+    # Scrape with PB analysis
+    result = await scraper.scrape_reviews(
+        place_id=place_id,
+        max_reviews=5,  # Small number for demo
+        date_range="1month"
+    )
+
+    # Get PB analysis summary
+    pb_summary = scraper.get_pb_analysis_summary()
+
+    safe_print(f"\nPB Analysis Summary:")
+    safe_print(f"  Total analyses: {pb_summary['total_analyses']}")
+    safe_print(f"  Successful: {pb_summary['successful_analyses']}")
+
+    if pb_summary.get('analysis_types'):
+        safe_print(f"  Analysis types:")
+        for analysis_type, count in pb_summary['analysis_types'].items():
+            safe_print(f"    {analysis_type}: {count}")
+
+    if pb_summary.get('common_warnings'):
+        safe_print(f"  Common warnings: {pb_summary['common_warnings']}")
+
+    if pb_summary.get('common_recommendations'):
+        safe_print(f"  Recommendations:")
+        for rec in pb_summary['common_recommendations']:
+            safe_print(f"    - {rec}")
+
+    # Export PB analysis history
+    success = scraper.export_pb_analysis_history()
+    if success:
+        safe_print("  PB analysis history exported to files")
+
+    # Show individual PB analysis results
+    if scraper.pb_analysis_results:
+        safe_print(f"\nRecent PB Analyses:")
+        for i, analysis in enumerate(scraper.pb_analysis_results[:3], 1):
+            safe_print(f"  Analysis {i}: {analysis.analysis_type} - {'✅' if analysis.success else '❌'}")
+            if analysis.warnings:
+                safe_print(f"    Warnings: {len(analysis.warnings)}")
+
+    return result
+
+
 async def main():
     """
     Run all examples
@@ -373,6 +442,7 @@ async def main():
         await example_5_date_filtering()
         await example_6_output_management()
         await example_7_error_handling()
+        await example_8_pb_analysis()  # New PB analysis example
 
         safe_print("\n" + "=" * 80)
         safe_print("✅ All examples completed successfully!")

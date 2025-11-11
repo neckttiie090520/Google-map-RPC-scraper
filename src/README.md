@@ -581,6 +581,149 @@ Contributions are welcome! Please ensure:
 3. Tests include multi-language support
 4. Documentation is updated
 
+## 🔍 Protocol Buffer Analysis (PB Analyzer)
+
+### Overview
+
+The framework includes a comprehensive **PB Analyzer** for debugging and understanding Google Maps Protocol Buffer responses. Inspired by SerpApi's google-maps-pb-decoder, it provides production-ready analysis capabilities.
+
+### Features
+
+- **Response Structure Analysis**: Understand Google's RPC response format
+- **Field Mapping Validation**: Verify parsing against known field mappings
+- **Change Detection**: Identify when Google changes response structures
+- **PB Parameter Decoding**: Analyze and decode Protocol Buffer parameters
+- **Developer Debugging**: Comprehensive debugging tools and reports
+
+### Using PB Analyzer
+
+#### Enable in Scraper
+```python
+scraper = create_production_scraper(
+    language="th",
+    region="th",
+    enable_pb_analysis=True,      # Enable PB analyzer
+    pb_analysis_verbose=True,     # Verbose debugging output
+    save_pb_analysis=True         # Save analysis results to files
+)
+```
+
+#### Standalone Analysis
+```python
+from src.utils.pb_analyzer import pb_analyzer
+
+# Analyze response data
+result = pb_analyzer.analyze_response_structure(response_data, "reviews")
+
+# Analyze PB parameters
+pb_result = pb_analyzer.analyze_pb_parameters("!1m6!1splace_id!6m4...")
+
+# Validate review parsing
+validation = pb_analyzer.validate_review_parsing(review_data)
+```
+
+#### Debugging Tool
+```bash
+# Analyze response file
+python examples/pb_debugging_tool.py --analyze-response response.json
+
+# Scrape and analyze in real-time
+python examples/pb_debugging_tool.py --scrape-and-analyze PLACE_ID
+
+# Compare structures to detect changes
+python examples/pb_debugging_tool.py --compare old.json new.json
+
+# Generate field documentation
+python examples/pb_debugging_tool.py --generate-docs *.json
+```
+
+### PB Analysis Capabilities
+
+#### 1. Response Structure Analysis
+- Detect response type (reviews, places, general)
+- Calculate structure depth and complexity
+- Generate structure fingerprints for comparison
+- Validate field mappings against expected patterns
+
+#### 2. Field Mapping Validation
+- Check all 12 review fields are being extracted correctly
+- Validate date parsing strategies (3-tier fallback)
+- Test for missing or changed field locations
+- Generate field coverage reports
+
+#### 3. Change Detection
+- Compare response structures over time
+- Detect when Google changes API response format
+- Alert to potential breaking changes
+- Provide recommendations for updates
+
+#### 4. PB Parameter Analysis
+- Decode Protocol Buffer parameter strings
+- Extract place IDs and pagination tokens
+- Understand parameter structure and components
+- Validate parameter format
+
+### Debugging Examples
+
+#### Check Parsing Issues
+```python
+# During scraping, PB analyzer will automatically:
+# - Validate first review structure
+# - Check field coverage
+# - Report missing or changed fields
+# - Save detailed analysis to pb_analysis/ directory
+```
+
+#### Generate Documentation
+```python
+# Create field documentation from multiple samples
+docs = pb_analyzer.generate_field_documentation(response_samples)
+# Returns comprehensive field documentation with success rates
+```
+
+#### Structure Comparison
+```python
+# Detect changes between old and new response formats
+changes = pb_analyzer.detect_structure_changes(current_data, baseline_data)
+if changes['structure_changed']:
+    print("Response structure has changed!")
+```
+
+### Configuration Options
+
+```python
+@dataclass
+class ScraperConfig:
+    # Debug and analysis options
+    enable_pb_analysis: bool = False      # Enable PB analyzer
+    pb_analysis_verbose: bool = False     # Verbose output
+    save_pb_analysis: bool = False        # Save analysis results
+```
+
+### Use Cases
+
+1. **Development**: Understand Google Maps response structures
+2. **Debugging**: Identify parsing issues and missing fields
+3. **Maintenance**: Detect when Google changes API format
+4. **Documentation**: Generate field mapping documentation
+5. **Quality Assurance**: Validate parsing completeness
+
+### PB Analysis Output
+
+The analyzer generates:
+- **Console Reports**: Real-time analysis output
+- **JSON Files**: Detailed analysis saved to files
+- **Summary Statistics**: Overview of all analyses
+- **Recommendations**: Actionable insights for improvements
+
+### Integration Benefits
+
+- **Proactive Change Detection**: Know when Google changes APIs
+- **Better Debugging**: Understand exactly what data is available
+- **Quality Assurance**: Ensure complete field extraction
+- **Documentation**: Auto-generate field mapping documentation
+- **Production Support**: Export analysis history for troubleshooting
+
 ## 📞 Support
 
 For issues and questions:
