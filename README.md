@@ -531,10 +531,25 @@ The authors assume **no liability** for misuse of this software.
 
 ## 🙏 Acknowledgments
 
-- Inspired by Google Maps RPC API research
-- Built with Python, Flask, and httpx
+This project stands on the shoulders of these amazing open-source projects:
+
+### Core Dependencies
+- **[py-googletrans](https://github.com/ssut/py-googletrans)** by ssut - Free Google Translate library for text translation
+- **[lingua-py](https://github.com/pemistahl/lingua-py)** by pemistahl - Accurate language detection library supporting 75+ languages
+- **[deep-translator](https://github.com/nidhaloff/deep-translator)** - Flexible multi-provider translation library
+
+### Inspiration & Reference
+- **[google-maps-scraper](https://github.com/gosom/google-maps-scraper)** by gosom - Reference implementation and Go-based Google Maps scraper
+- **[google-maps-pb-decoder](https://github.com/serpapi/google-maps-pb-decoder)** by serpapi - Protocol Buffer decoder for Google Maps responses
+- **[botasaurus](https://github.com/omkarcloud/botasaurus)** by omkarcloud - Anti-bot techniques and web scraping patterns
+
+### Browser Automation
+- **[playwright](https://github.com/microsoft/playwright)** by Microsoft - Reliable browser automation (inspired anti-bot techniques)
+
+### Special Thanks
 - Thai language support for Chiang Mai culinary tourism research
 - Community feedback and contributions
+- Built with Python, Flask, and httpx
 
 ---
 
