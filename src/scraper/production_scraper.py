@@ -47,8 +47,180 @@ try:
     PB_ANALYZER_AVAILABLE = True
 except ImportError:
     PB_ANALYZER_AVAILABLE = False
+    # Fallback type when PB analyzer is not available
+    class PBAnalysisResult:
+        pass
     GoogleMapsPBAnalyzer = None
-    PBAnalysisResult = None
+
+
+class LanguageConsistencyMonitor:
+    """
+    Real-time language consistency monitoring for English optimization
+    Tracks language consistency and triggers corrective actions when needed
+    """
+
+    def __init__(self, target_language='en', consistency_threshold=0.95):
+        self.target_language = target_language
+        self.consistency_threshold = consistency_threshold  # 95% English threshold
+        self.language_samples = []
+        self.total_reviews_analyzed = 0
+        self.english_reviews_count = 0
+        self.last_consistency_check = time.time()
+        self.consistency_history = []
+        self.alerts_triggered = 0
+        self.session_refreshes = 0
+
+    def analyze_review_language(self, review_text: str) -> tuple[bool, str]:
+        """
+        Analyze a single review for language consistency
+
+        Args:
+            review_text: Text content of the review
+
+        Returns:
+            tuple: (is_target_language, detected_language)
+        """
+        if not review_text or len(review_text.strip()) < 5:
+            return False, "too_short"
+
+        text = review_text.strip()
+
+        # Enhanced Thai character detection (more comprehensive)
+        thai_chars = len([c for c in text if ord(c) >= 3584 and ord(c) <= 3711])
+        english_chars = len([c for c in text if c.isalpha() and c.isascii()])
+
+        # Additional language indicators
+        chinese_chars = len([c for c in text if ord(c) >= 19968 and ord(c) <= 40959])
+        japanese_chars = len([c for c in text if ord(c) >= 12352 and ord(c) <= 12447])
+        korean_chars = len([c for c in text if ord(c) >= 44032 and ord(c) <= 55215])
+
+        # Enhanced language detection logic
+        if thai_chars > 3:
+            return False, "thai"
+        elif chinese_chars > 3:
+            return False, "chinese"
+        elif japanese_chars > 3:
+            return False, "japanese"
+        elif korean_chars > 3:
+            return False, "korean"
+        elif english_chars > 5:
+            return True, "english"
+        else:
+            return False, "unknown"
+
+    def add_review_sample(self, review_text: str) -> None:
+        """
+        Add a review sample to the language consistency monitor
+
+        Args:
+            review_text: Text content of the review
+        """
+        is_english, detected_language = self.analyze_review_language(review_text)
+
+        self.total_reviews_analyzed += 1
+        if is_english:
+            self.english_reviews_count += 1
+
+        # Store sample with timestamp
+        self.language_samples.append({
+            'timestamp': time.time(),
+            'is_english': is_english,
+            'language': detected_language,
+            'text_length': len(review_text)
+        })
+
+        # Keep only recent samples (last 100)
+        if len(self.language_samples) > 100:
+            self.language_samples = self.language_samples[-100:]
+
+    def get_current_consistency(self) -> float:
+        """
+        Calculate current English language consistency
+
+        Returns:
+            float: Current consistency percentage (0.0 to 1.0)
+        """
+        if self.total_reviews_analyzed == 0:
+            return 0.0
+
+        return self.english_reviews_count / self.total_reviews_analyzed
+
+    def check_consistency_threshold(self) -> dict:
+        """
+        Check if current consistency meets the threshold
+
+        Returns:
+            dict: Consistency status and recommendations
+        """
+        current_consistency = self.get_current_consistency()
+
+        status = {
+            'current_consistency': current_consistency,
+            'target_consistency': self.consistency_threshold,
+            'meets_threshold': current_consistency >= self.consistency_threshold,
+            'total_reviews': self.total_reviews_analyzed,
+            'english_reviews': self.english_reviews_count,
+            'alert_triggered': False,
+            'recommendation': 'continue'
+        }
+
+        # Determine alerts and recommendations
+        if current_consistency < self.consistency_threshold:
+            status['alert_triggered'] = True
+            status['recommendation'] = 'session_refresh'
+            self.alerts_triggered += 1
+
+        elif current_consistency < self.consistency_threshold - 0.05:  # 90% threshold
+            status['recommendation'] = 'enhanced_language_enforcement'
+
+        return status
+
+    def should_trigger_recovery(self) -> bool:
+        """
+        Check if language recovery should be triggered
+
+        Returns:
+            bool: True if recovery should be triggered
+        """
+        status = self.check_consistency_threshold()
+        return status['alert_triggered']
+
+    def get_detailed_report(self) -> dict:
+        """
+        Get detailed language consistency report
+
+        Returns:
+            dict: Comprehensive language analysis report
+        """
+        # Language distribution
+        language_counts = {}
+        for sample in self.language_samples:
+            lang = sample['language']
+            language_counts[lang] = language_counts.get(lang, 0) + 1
+
+        # Calculate rolling consistency (last 50 reviews)
+        recent_samples = self.language_samples[-50:]
+        if recent_samples:
+            recent_english = sum(1 for s in recent_samples if s['is_english'])
+            recent_consistency = recent_english / len(recent_samples)
+        else:
+            recent_consistency = 0.0
+
+        return {
+            'target_language': self.target_language,
+            'total_reviews': len(self.language_samples),
+            'total_reviews_analyzed': self.total_reviews_analyzed,
+            'current_consistency': self.get_current_consistency(),
+            'recent_consistency': recent_consistency,
+            'consistency_threshold': self.consistency_threshold,
+            'language_distribution': language_counts,
+            'alerts_triggered': self.alerts_triggered,
+            'session_refreshes': self.session_refreshes,
+            'recovery_triggers': self.alerts_triggered,
+            'meets_threshold': self.get_current_consistency() >= self.consistency_threshold,
+            'recommendation': self.check_consistency_threshold()['recommendation']
+        }
+    # Don't override PBAnalysisResult here - it's already imported from pb_analyzer
 
 # Import enhanced language service for detection and translation
 try:
@@ -79,6 +251,7 @@ try:
         HumanLikeDelay,
         ProxyConfig,
         ProxyRotator,
+        EnhancedProxyRotator,
         RateLimitDetector
     )
 except ImportError:
@@ -160,6 +333,70 @@ except ImportError:
             return len(recent_requests) / self.window_seconds
 
 
+# ==================== PROTOBUF HANDLING ====================
+
+def decode_review_protobuf(encoded_string: str) -> str:
+    """
+    Decode Base64-encoded Protobuf review data using blackboxprotobuf.
+
+    This function handles the CAES, CAI, CNEI prefixed data that Google
+    sends when the scraper is detected and downgraded to protobuf format.
+
+    Args:
+        encoded_string: Base64-encoded protobuf string from Google Maps API
+
+    Returns:
+        Decoded review text or empty string if decoding fails
+    """
+    try:
+        # Import blackboxprotobuf only when needed
+        import blackboxprotobuf
+        import base64
+        import re
+
+        # 1. Decode Base64 to raw bytes
+        # Handle padding issues that Google may introduce
+        padding = '=' * (4 - (len(encoded_string) % 4))
+        raw_bytes = base64.b64decode(encoded_string + padding)
+
+        # 2. Decode protobuf using blackboxprotobuf
+        # This returns a Python dict and inferred typedef
+        message, typedef = blackboxprotobuf.decode_message(raw_bytes)
+
+        # 3. Extract review text from nested protobuf structure
+        review_text = ""
+
+        def find_long_string(data):
+            nonlocal review_text
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    # Review text is typically the longest string field
+                    if isinstance(v, str) and len(v) > len(review_text) and len(v) > 50:
+                        # Prefer text that looks like a review (readable characters)
+                        if not re.search(r'[^\x20-\x7E\u00A0-\uFFFF]', v):  # No control characters
+                            review_text = v
+                    elif isinstance(v, (dict, list)):
+                        find_long_string(v)
+            elif isinstance(data, list):
+                for item in data:
+                    find_long_string(item)
+
+        find_long_string(message)
+
+        if review_text:
+            return review_text.strip()
+        else:
+            # If no long string found, return empty string to maintain consistency
+            print(f"DEBUG: Protobuf decoded but no review text found in: {str(message)[:200]}...")
+            return ""
+
+    except ImportError:
+        print("Warning: blackboxprotobuf not installed. Install with: pip install blackboxprotobuf")
+        return ""
+    except Exception as e:
+        print(f"DEBUG: Protobuf decoding failed: {str(e)}")
+        return ""
+
 # ==================== DATA STRUCTURES ====================
 
 @dataclass
@@ -181,6 +418,9 @@ class ProductionReview:
     owner_response: str
     owner_response_translated: str  # Translated owner response
     page_number: int
+    review_text_language: str = ""  # Language of review text (detected)
+    owner_response_language: str = ""  # Language of owner response (detected)
+    translation_confidence: float = 0.0  # Confidence score for language detection
     place_id: str = ""  # Place ID where review was collected
     place_name: str = ""  # Place name where review was collected
 
@@ -198,6 +438,9 @@ class ProductionReview:
             'review_text_translated': self.review_text_translated,
             'original_language': self.original_language,
             'target_language': self.target_language,
+            'review_text_language': self.review_text_language,
+            'owner_response_language': self.owner_response_language,
+            'translation_confidence': self.translation_confidence,
             'review_likes': self.review_likes,
             'review_photos_count': self.review_photos_count,
             'owner_response': self.owner_response,
@@ -210,8 +453,8 @@ class ProductionReview:
 
 @dataclass
 class ScraperConfig:
-    """Complete scraper configuration"""
-    # Anti-bot settings
+    """Complete scraper configuration with enhanced proxy support"""
+    # Basic settings
     use_proxy: bool = False
     proxy_list: Optional[List[str]] = None
     fast_mode: bool = True
@@ -222,8 +465,8 @@ class ScraperConfig:
     max_retries: int = 3
 
     # Language settings
-    language: str = "th"
-    region: str = "th"
+    language: str = "en"
+    region: str = "sg"
 
     # Translation settings
     enable_translation: bool = False
@@ -234,10 +477,55 @@ class ScraperConfig:
     use_enhanced_detection: bool = True  # Use langdetect for better accuracy
     translation_batch_size: int = 50  # Process translations in batches for performance
 
+    # Enhanced Proxy Configuration
+    use_enhanced_proxy_manager: bool = False  # Enable advanced proxy management (DISABLED for stability)
+
+    # Proxy source settings
+    proxy_use_static_sources: bool = True  # Use TheSpeedX static proxy lists
+    proxy_use_dynamic_sources: bool = True  # Use jundymek dynamic proxies
+    proxy_use_singapore_sources: bool = True  # Use Singapore proxies for English scraping
+    proxy_use_english_sources: bool = True  # Use English-speaking country proxies for 100% English
+
+    # Singapore proxy configuration (for English scraping)
+    proxy_singapore_priority: bool = True  # Prioritize Singapore proxies
+    proxy_english_fallback: bool = True  # Use US/UK proxies as fallback
+
+    # Static proxy configuration (TheSpeedX)
+    proxy_static_urls: Optional[List[str]] = None  # Custom static proxy URLs
+    proxy_protocols_enabled: Optional[List[str]] = None  # ['http', 'socks4', 'socks5']
+
+    # Dynamic proxy configuration (jundymek)
+    proxy_dynamic_countries: Optional[List[str]] = None  # Preferred countries: ['US', 'GB', 'DE']
+    proxy_dynamic_count: int = 50  # Number of dynamic proxies to fetch
+    proxy_dynamic_anonymity: Optional[List[str]] = None  # ['anonymous', 'elite']
+
+    # Proxy performance settings
+    proxy_max_pool_size: int = 1000  # Maximum proxies to keep in memory
+    proxy_test_timeout: float = 5.0  # Timeout for proxy testing
+    proxy_test_url: str = "http://httpbin.org/ip"  # URL for proxy testing
+    proxy_min_success_rate: float = 50.0  # Minimum success rate to keep proxy
+    proxy_max_response_time: float = 10.0  # Maximum acceptable response time
+
+    # Proxy rotation and strategy
+    proxy_rotation_strategy: str = "health_based"  # "round_robin", "health_based", "random"
+    proxy_health_check_interval: int = 300  # Check proxy health every 5 minutes
+    proxy_refresh_interval: int = 3600  # Refresh proxy list every hour
+    proxy_concurrent_tests: int = 50  # Number of proxies to test simultaneously
+
+    # Advanced proxy features
+    proxy_enable_geographic_routing: bool = False  # Route requests through specific countries
+    proxy_enable_protocol_optimization: bool = True  # Optimize protocol selection
+    proxy_failover_enabled: bool = True  # Automatic proxy failover on failures
+    proxy_performance_tracking: bool = True  # Track proxy performance metrics
+
     # Debug and analysis options
     enable_pb_analysis: bool = False  # Enable Protocol Buffer analysis for debugging
     pb_analysis_verbose: bool = False  # Verbose PB analysis output
     save_pb_analysis: bool = False  # Save PB analysis results to files
+
+    # Proxy debugging
+    proxy_debug_mode: bool = False  # Enable detailed proxy logging
+    proxy_save_stats: bool = True  # Save proxy performance statistics
 
 
 # ==================== PRODUCTION SCRAPER ====================
@@ -307,16 +595,29 @@ class ProductionGoogleMapsScraper:
             else:
                 safe_print("⚠ Language service not available - install: pip install langdetect deep-translator")
 
-        # Proxy rotation
+        # Enhanced Proxy rotation
         self.proxy_rotator = None
         self.current_proxy = None
-        if config.use_proxy and config.proxy_list:
-            proxies = [
-                ProxyConfig(http_proxy=url, https_proxy=url)
-                for url in config.proxy_list
-            ]
-            self.proxy_rotator = ProxyRotator(proxies)
-            self.current_proxy = self.proxy_rotator.get_next_proxy()
+        self.proxy_manager_initialized = False
+
+        if config.use_proxy:
+            # Prepare legacy proxy list if provided
+            legacy_proxies = []
+            if config.proxy_list:
+                legacy_proxies = [
+                    ProxyConfig(http_proxy=url, https_proxy=url)
+                    for url in config.proxy_list
+                ]
+
+            # Initialize enhanced proxy rotator
+            self.proxy_rotator = EnhancedProxyRotator(
+                use_enhanced_manager=config.use_enhanced_proxy_manager,
+                legacy_proxies=legacy_proxies
+            )
+
+            # Note: Enhanced proxy manager will be initialized asynchronously in initialize_proxy_manager()
+        else:
+            self.proxy_rotator = None
 
         # Stats
         self.stats = {
@@ -336,24 +637,123 @@ class ProductionGoogleMapsScraper:
         self.last_refresh_time = time.time()
         self._init_session_identity()
 
+        # Real-time language consistency monitoring for English optimization
+        self.language_consistency_monitor = LanguageConsistencyMonitor()
+        self.language_sampling_window = 50  # Check last 50 reviews for consistency
+
+    async def initialize_proxy_manager(self):
+        """
+        Initialize enhanced proxy manager if proxy rotation is enabled.
+        This should be called before starting scraping.
+        """
+        if (self.proxy_rotator and
+            hasattr(self.proxy_rotator, 'initialize') and
+            self.config.use_enhanced_proxy_manager and
+            not self.proxy_manager_initialized):
+
+            try:
+                # Add timeout and resource safety for proxy manager initialization
+                try:
+                    await asyncio.wait_for(
+                        self.proxy_rotator.initialize(self.config),
+                        timeout=30.0  # 30 second timeout
+                    )
+                    self.proxy_manager_initialized = True
+                    safe_print("✅ Enhanced proxy manager initialized successfully")
+
+                    # Get initial proxy
+                    self.current_proxy = await self.proxy_rotator.get_next_proxy()
+                    if self.current_proxy:
+                        safe_print(f"🌐 Selected initial proxy: {self._get_proxy_display_name(self.current_proxy)}")
+                    else:
+                        safe_print("⚠️ No proxies available from enhanced manager")
+
+                except asyncio.TimeoutError:
+                    safe_print("⚠️ Enhanced proxy manager initialization timed out")
+                    self.proxy_manager_initialized = False
+
+            except Exception as e:
+                safe_print(f"❌ Failed to initialize enhanced proxy manager: {str(e)}")
+                self.proxy_manager_initialized = False
+
+                # Graceful fallback - disable enhanced proxy manager
+                self.config.use_enhanced_proxy_manager = False
+                safe_print("🔄 Falling back to standard proxy management")
+
+    def _get_proxy_display_name(self, proxy_config) -> str:
+        """Get a human-readable name for the proxy"""
+        if hasattr(proxy_config, 'to_httpx_proxies'):
+            proxy_dict = proxy_config.to_httpx_proxies()
+            if proxy_dict:
+                proxy_url = list(proxy_dict.values())[0]
+                # Extract IP:PORT from proxy URL
+                if '://' in proxy_url:
+                    return proxy_url.split('://', 1)[1]
+                return proxy_url
+        return "Unknown Proxy"
+
     def _generate_session_headers(self) -> Dict[str, str]:
-        """Create stable headers for the current scraping session."""
+        """Create stable headers for the current scraping session with enhanced language enforcement."""
         headers = generate_randomized_headers(
             language=self.config.language,
             region=self.config.region
         )
-        headers.update({
-            'X-Goog-AuthUser': '0',
-            'X-Goog-Visitor-Id': self.config.region,
-            'Accept-Language': f"{self.config.language}-{self.config.region.upper()},{self.config.language};q=0.9,en;q=0.8,*;q=0.5",
-            'Content-Language': self.config.language,
-            'X-Preferred-Language': self.config.language,
-            'X-Goog-Encode-Response': 'UTF-8',
-            'Accept-Charset': 'utf-8',
-            'X-Language': self.config.language,
-            'X-Region': self.config.region,
-            'X-Force-Language': 'true',
-        })
+
+        # Advanced English language headers for maximum consistency
+        if self.config.language.lower() == 'en':
+            # Multi-variant Accept-Language headers for English optimization
+            english_accept_language_variants = [
+                # Primary US English with strong preference
+                f"en-US,en;q=0.95,en-GB;q=0.9,en;q=0.85,*;q=0.1",
+                # UK-first variant
+                f"en-GB,en;q=0.95,en-US;q=0.9,en;q=0.85,*;q=0.1",
+                # Australian variant
+                f"en-AU,en;q=0.95,en-US;q=0.9,en-GB;q=0.85,en;q=0.8,*;q=0.1",
+                # Canadian variant
+                f"en-CA,en;q=0.95,en-US;q=0.9,en-GB;q=0.85,en;q=0.8,*;q=0.1"
+            ]
+
+            # Select Accept-Language header based on region
+            if self.config.region.lower() == 'gb':
+                accept_language = english_accept_language_variants[1]  # UK-first
+            elif self.config.region.lower() == 'au':
+                accept_language = english_accept_language_variants[2]  # AU-first
+            elif self.config.region.lower() == 'ca':
+                accept_language = english_accept_language_variants[3]  # CA-first
+            else:
+                accept_language = english_accept_language_variants[0]  # US-first (default)
+
+            headers.update({
+                'X-Goog-AuthUser': '0',
+                'X-Goog-Visitor-Id': self.config.region,
+                'Accept-Language': accept_language,
+                'Content-Language': 'en-US',  # Force US English content
+                'X-Preferred-Language': 'en-US',  # Strong English preference
+                'X-Google-Language': 'en-US',  # Google-specific language header
+                'X-Language': 'en',  # Simple language code
+                'X-Region': self.config.region,
+                'X-Force-Language': 'true',  # Force language override
+                'X-Goog-Encode-Response': 'UTF-8',
+                'Accept-Charset': 'utf-8',
+                'Cache-Control': 'no-cache, no-store, max-age=0',  # Prevent cached content in other languages
+                'Pragma': 'no-cache',
+            })
+            print(f"[ENGLISH HEADERS] Optimized Accept-Language: {accept_language}")
+
+        else:
+            # Standard headers for non-English languages
+            headers.update({
+                'X-Goog-AuthUser': '0',
+                'X-Goog-Visitor-Id': self.config.region,
+                'Accept-Language': f"{self.config.language}-{self.config.region.upper()},{self.config.language};q=0.9,en;q=0.8,*;q=0.5",
+                'Content-Language': self.config.language,
+                'X-Preferred-Language': self.config.language,
+                'X-Goog-Encode-Response': 'UTF-8',
+                'Accept-Charset': 'utf-8',
+                'X-Language': self.config.language,
+                'X-Region': self.config.region,
+                'X-Force-Language': 'true',
+            })
         user_agent = headers.get('User-Agent', '')
         if 'Googlebot' in user_agent:
             headers['User-Agent'] = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -400,15 +800,34 @@ class ProductionGoogleMapsScraper:
         return self.session_cookies.copy()
 
     def _should_proactively_refresh_session(self, page_num: int) -> bool:
-        """Determine if we should proactively refresh session to prevent language switching."""
-        # Refresh every 50 pages to prevent Google's session token expiration
-        if self.stats['pages_since_refresh'] >= 50:
+        """
+        Determine if we should proactively refresh session to prevent language switching.
+
+        REVISED STRATEGY: The aggressive 35-page refresh was actually CAUSING language switching
+        by destabilizing session fingerprints. We now use intelligent, adaptive refresh logic
+        based on actual session health rather than fixed intervals.
+        """
+        # PRIMARY: Only refresh when actually approaching dangerous territory (80-100 pages)
+        # This prevents unnecessary session changes that were causing the original problem
+        if self.stats['pages_since_refresh'] >= 90:
+            print(f"SESSION STRATEGY: CRITICAL refresh at page {page_num} - approaching 100-page stability limit")
             return True
 
-        # Also refresh if it's been more than 30 minutes (1800 seconds)
+        # SECONDARY: Time-based refresh only after extended periods (30 minutes instead of 15)
         current_time = time.time()
-        if current_time - self.last_refresh_time > 1800:
+        if current_time - self.last_refresh_time > 1800:  # 30 minutes
+            print(f"SESSION STRATEGY: Time-based refresh - {(current_time - self.last_refresh_time)/60:.1f} minutes elapsed")
             return True
+
+        # TERTIARY: Manual language inconsistency triggers (not automatic)
+        # Only refresh if we've detected actual language switching, not pre-emptively
+        if hasattr(self, '_language_inconsistency_detected') and self._language_inconsistency_detected:
+            print(f"SESSION STRATEGY: Language inconsistency detected - refreshing session")
+            self._language_inconsistency_detected = False
+            return True
+
+        # REMOVED: The aggressive page_num % 15 check that was causing over-refreshing
+        # This was the main culprit behind the page 60 language switching issue
 
         return False
 
@@ -419,14 +838,14 @@ class ProductionGoogleMapsScraper:
 
     def _detect_response_language_consistency(self, reviews_data: list, page_num: int) -> Tuple[bool, str]:
         """
-        Analyze response content for language consistency.
+        REVISED: More conservative language consistency analysis to reduce false positives.
         Returns tuple of (is_consistent, detected_primary_language)
         """
         if not reviews_data or len(reviews_data) == 0:
             return True, "empty"
 
-        # Sample first few review texts to detect language
-        sample_reviews = reviews_data[:3] if len(reviews_data) >= 3 else reviews_data
+        # INCREASED: Sample more reviews for better accuracy (5 instead of 3)
+        sample_reviews = reviews_data[:5] if len(reviews_data) >= 5 else reviews_data
         detected_languages = []
 
         for review_el in sample_reviews:
@@ -435,34 +854,32 @@ class ProductionGoogleMapsScraper:
                 isinstance(review_el[2], str) and
                 review_el[2].startswith(('CAES', 'CAI', 'CNEI'))):  # Common protobuf prefixes
 
-                print(f"DEBUG: Found protobuf-encoded review: {review_el[2][:50]}...")
-                # Reviews are now encoded - cannot extract text for language detection
-                # Mark as encoded format
+                # REVISED: Don't immediately trigger refresh for encoded data
+                # This is normal behavior, not a problem
                 detected_languages.append('encoded')
                 continue
 
             # Try original extraction method for backward compatibility
             if len(review_el) > 2 and len(review_el[2]) > 15 and len(review_el[2][15]) > 0 and len(review_el[2][15][0]) > 0:
                 review_text = str(review_el[2][15][0][0])[:200]  # First 200 chars
-                print(f"DEBUG: Extracted review text: {review_text[:100]}...")
 
-                # Enhanced language detection with lower thresholds
+                # REVISED: More conservative language detection with higher thresholds
                 thai_chars = len([c for c in review_text if 'ก' <= c <= 'ฮ' or 'ฯ' in review_text])
                 korean_chars = len([c for c in review_text if '가' <= c <= '힣'])
                 japanese_chars = len([c for c in review_text if 'あ' <= c <= 'ゟ' or 'ァ' <= c <= 'ヿ'])
                 english_chars = len([c for c in review_text if 'a' <= c.lower() <= 'z'])
                 chinese_chars = len([c for c in review_text if '\u4e00' <= c <= '\u9fff'])
 
-                # Enhanced detection with more sensitive thresholds
-                if thai_chars >= 2:  # Lowered from 5
+                # REVISED: Higher thresholds to reduce false positives
+                if thai_chars >= 5:  # Increased back to 5
                     detected_languages.append('TH')
-                elif korean_chars >= 2:  # Lowered from 5
+                elif korean_chars >= 5:  # Increased back to 5
                     detected_languages.append('KO')
-                elif chinese_chars >= 2:
+                elif chinese_chars >= 5:
                     detected_languages.append('ZH')
-                elif japanese_chars >= 2:  # Lowered from 5
+                elif japanese_chars >= 5:  # Increased back to 5
                     detected_languages.append('JA')
-                elif english_chars >= 5:  # Lowered from 10
+                elif english_chars >= 10:  # Increased back to 10
                     detected_languages.append('EN')
                 else:
                     detected_languages.append('UNKNOWN')
@@ -479,8 +896,11 @@ class ProductionGoogleMapsScraper:
         primary_language = 'UNKNOWN'
 
         # If all reviews are encoded, we can't detect language from text
+        # REVISED: Don't force refresh - encoded data is normal, not a problem
         if encoded_count == len(detected_languages):
             primary_language = 'ENCODED_DATA'
+            print(f"INFO: All reviews are encoded (protobuf format) - normal behavior")
+            return True, primary_language  # Return consistent to avoid unnecessary refresh
         else:
             max_count = max([th_count, en_count, ko_count, ja_count, zh_count])
 
@@ -497,9 +917,14 @@ class ProductionGoogleMapsScraper:
             elif zh_count == max_count:
                 primary_language = 'ZH'
 
-        # Check if response is consistent (single dominant language)
+        # REVISED: More conservative consistency check - allow for mixed content in early pages
         non_zero_counts = [count for count in [th_count, en_count, ko_count, ja_count, zh_count] if count > 0]
-        is_consistent = len(non_zero_counts) <= 1  # Only one language detected
+
+        # For early pages (1-20), allow more language mixing as it's natural
+        if page_num <= 20:
+            is_consistent = len(non_zero_counts) <= 2  # Allow up to 2 languages in early pages
+        else:
+            is_consistent = len(non_zero_counts) <= 1  # Stricter after page 20
 
         # Log language analysis for monitoring
         print(f"LANGUAGE ANALYSIS (Page {page_num}):")
@@ -511,20 +936,36 @@ class ProductionGoogleMapsScraper:
 
     def _should_refresh_based_on_language_response(self, is_consistent: bool, detected_language: str, page_num: int) -> bool:
         """
-        Determine if session should be refreshed based on language response analysis.
-        Returns True if refresh is needed.
+        REVISED: Conservative language drift detection to reduce unnecessary refreshes.
+        Only refresh when there's clear evidence of sustained language switching.
         """
         # If response is consistent, no refresh needed
         if is_consistent:
             return False
 
-        # If we get inconsistent languages, this might indicate session degradation
-        safe_print(f"   WARNING: Language inconsistency detected (mixed languages in response)")
+        # REVISED: Only consider language switching after substantial page count (50+ pages)
+        # This prevents false positives in early pages where responses can be mixed
+        expected_lang = self.config.language.upper()
 
-        # If this is after page 60 and we get mixed languages, it's likely session degradation
-        if page_num > 60:
-            safe_print(f"   CRITICAL: Language mixing after page {page_num} indicates session degradation")
-            return True
+        # Skip language checking for first 50 pages - responses can naturally vary
+        if page_num <= 50:
+            print(f"INFO: Language inconsistency at page {page_num} ignored - early pages can vary naturally")
+            return False
+
+        print(f"WARNING: Language inconsistency detected at page {page_num}: {detected_language} vs expected {expected_lang}")
+
+        # REVISED: Don't treat encoded data as a problem
+        if detected_language == 'ENCODED_DATA':
+            print(f"INFO: Encoded data detected - normal behavior, no refresh needed")
+            return False
+
+        # CONSERVATIVE: Only refresh if we have strong evidence of sustained language switching
+        # And only after substantial progress (50+ pages)
+        if page_num > 50 and detected_language != expected_lang and detected_language != 'UNKNOWN':
+            # Mark for manual refresh check rather than immediate refresh
+            self._language_inconsistency_detected = True
+            print(f"INFO: Language inconsistency marked for review - will refresh if pattern continues")
+            return False  # Don't refresh immediately, wait for confirmation
 
         return False
 
@@ -545,8 +986,55 @@ class ProductionGoogleMapsScraper:
 
     def _should_log_session_health(self, page_num: int) -> bool:
         """Determine if we should log session health for this page."""
-        # Log every 20 pages for monitoring
-        return page_num % 20 == 1 or page_num > 60
+        # More frequent logging for better monitoring - every 10 pages
+        # Also always log after page 25 to catch language switching issues early
+        return page_num % 10 == 1 or page_num > 25
+
+    def _check_language_drift_early(self, page_num: int, sample_reviews: list) -> tuple:
+        """
+        Early language drift detection before it becomes a problem.
+        Returns (is_drifting, drift_level, recommended_action)
+        """
+        if page_num < 10 or not sample_reviews:
+            return False, 0, "continue"
+
+        # Sample more reviews for better detection
+        detected_languages = []
+
+        for review_el in sample_reviews[:5]:  # Check 5 reviews instead of 3
+            if len(review_el) > 2 and len(review_el[2]) > 15 and len(review_el[2][15]) > 0 and len(review_el[2][15][0]) > 0:
+                review_text = str(review_el[2][15][0][0])[:100]  # First 100 chars
+
+                # Quick language detection
+                thai_chars = len([c for c in review_text if 'ก' <= c <= 'ฮ'])
+                english_chars = len([c for c in review_text if 'a' <= c.lower() <= 'z'])
+
+                if thai_chars >= 2:
+                    detected_languages.append('TH')
+                elif english_chars >= 3:
+                    detected_languages.append('EN')
+
+        if not detected_languages:
+            return False, 0, "continue"
+
+        # Calculate language consistency
+        expected_lang = self.config.language.upper()
+        matching_count = detected_languages.count(expected_lang)
+        consistency_rate = matching_count / len(detected_languages)
+
+        # Early warning system
+        if consistency_rate < 0.6:  # Less than 60% matching language
+            drift_level = "high"
+            action = "refresh_immediate"
+        elif consistency_rate < 0.8:  # Less than 80% matching language
+            drift_level = "medium"
+            action = "refresh_soon"
+        else:
+            drift_level = "low"
+            action = "monitor"
+
+        is_drifting = consistency_rate < 0.8
+        return is_drifting, drift_level, action
 
     def translate_text_field(self, text: str) -> Tuple[str, str]:
         """
@@ -1110,7 +1598,7 @@ class ProductionGoogleMapsScraper:
             safe_print(f"⚠ Failed to export PB analysis history: {e}")
             return False
 
-    def parse_review(self, entry: list, page_num: int, place_id: str = "", place_name: str = "") -> Optional[ProductionReview]:
+    def parse_review(self, entry: list, page_num: int, review_idx: int = 0, place_id: str = "", place_name: str = "") -> Optional[ProductionReview]:
         """
         Parse single review with complete field extraction
         Using the correct structure from working HTTP scraper
@@ -1170,8 +1658,13 @@ class ProductionGoogleMapsScraper:
             if (isinstance(raw_review_data, str) and
                 raw_review_data.startswith(('CAES', 'CAI', 'CNEI'))):  # Protobuf prefixes
 
-                # New protobuf-encoded format - cannot extract text without decoder
-                review_text = "[ENCODED_DATA - Requires protobuf decoder]"
+                # New protobuf-encoded format - decode using blackboxprotobuf
+                review_text = decode_review_protobuf(raw_review_data)
+                if not review_text:
+                    review_text = "[ENCODED_DATA - Decoding failed]"
+
+                print(f"DEBUG: Decoded protobuf review: {review_text[:100]}...")
+
                 # Note: review_id is probably also the encoded data, not a real ID
                 if not review_id or review_id == raw_review_data:
                     review_id = f"encoded_review_{page_num}_{review_idx}"
@@ -1282,6 +1775,21 @@ class ProductionGoogleMapsScraper:
             review_text_translated = review_text
             owner_response_translated = owner_response
 
+            # Real-time language consistency monitoring for English optimization
+            if hasattr(self, 'language_consistency_monitor') and self.config.language.lower() == 'en':
+                self.language_consistency_monitor.add_review_sample(review_text)
+
+                # Check if language recovery should be triggered
+                if self.language_consistency_monitor.should_trigger_recovery():
+                    consistency_report = self.language_consistency_monitor.get_detailed_report()
+                    print(f"\n[LANGUAGE ALERT] Consistency below threshold: {consistency_report['current_consistency']:.1%}")
+                    print(f"[LANGUAGE ACTION] Triggering session refresh for recovery...")
+                    self._refresh_session_identity("language_consistency_recovery")
+
+                    # Log detailed language report
+                    print(f"[LANGUAGE REPORT] Recent consistency: {consistency_report['recent_consistency']:.1%}")
+                    print(f"[LANGUAGE REPORT] Language distribution: {consistency_report['language_distribution']}")
+
             if self.language_service:
                 # Process review text
                 if self.config.translate_review_text and review_text:
@@ -1321,6 +1829,37 @@ class ProductionGoogleMapsScraper:
             safe_print(f"   Parse error: {e}")
             return None
 
+    def _get_optimal_english_marker(self, configs: list, region_code: str) -> str:
+        """
+        Select optimal English language configuration based on region and performance history
+
+        Args:
+            configs: List of English language marker configurations
+            region_code: Current region code (e.g., 'sg', 'us', 'gb')
+
+        Returns:
+            Optimal English language marker for maximum consistency
+        """
+        # Priority-based selection for English language optimization
+        if region_code == 'us':
+            # US region - prioritize US configuration
+            return configs[0]  # US configuration
+        elif region_code == 'gb':
+            # UK region - prioritize UK configuration
+            return configs[1]  # UK configuration
+        elif region_code == 'au':
+            # Australia region - prioritize AU configuration
+            return configs[2]  # AU configuration
+        elif region_code == 'ca':
+            # Canada region - prioritize CA configuration
+            return configs[3]  # CA configuration
+        elif region_code == 'sg':
+            # Singapore region - use Singapore-specific configuration
+            return configs[4]  # Singapore configuration
+        else:
+            # Default to US configuration for maximum English consistency
+            return configs[0]  # US configuration
+
     async def fetch_rpc_page(
         self,
         client: httpx.AsyncClient,
@@ -1353,6 +1892,16 @@ class ProductionGoogleMapsScraper:
                   f"&gl={self.config.region}"
                   f"&tbm=lcl")
 
+        # Add review translation control for maximum English consistency
+        if self.config.language.lower() == 'en':
+            # Force translation to English for all reviews
+            rpc_url += "&reviews_no_translations=false&reviews_sort=most_relevant"
+            print(f"[ENGLISH ENFORCEMENT] Translation control enabled: reviews_no_translations=false")
+        else:
+            # Keep original reviews for other languages
+            rpc_url += "&reviews_no_translations=true"
+            print(f"[LANGUAGE ENFORCEMENT] Keeping original language: reviews_no_translations=true")
+
         # Build pb parameter with language-specific components
         # Critical: Include language enforcement directly in pb parameter structure
         pb_param = f"!1m6!1s{place_id}!6m4!4m1!1e1!4m1!1e3!2m2!1i20!2s"
@@ -1362,20 +1911,37 @@ class ProductionGoogleMapsScraper:
         else:
             pb_param += ""
 
-        # Enhanced pb parameter with STRONG language consistency components
+        # Enhanced pb parameter with language consistency components
         region_code = self.config.region.lower()
         language_key = self.config.language.lower()
         sanitized_lang = language_key.replace('-', '')
+        base_lang_code = language_key.split('-')[0]  # Extract base language (en from en-US)
+
+        # Advanced multi-regional English language configurations for maximum consistency
+        english_language_configs = [
+            # Primary US configuration
+            f"!3m2!1sen!2sus!4m2!1sen!2sus!3sen!4sus",
+            # UK configuration
+            f"!3m2!1sen!2sgb!4m2!1sen!2sgb!3sen!4sgb",
+            # Australian configuration
+            f"!3m2!1sen!2sau!4m2!1sen!2sau!3sen!4sau",
+            # Canadian configuration
+            f"!3m2!1sen!2sca!4m2!1sen!2sca!3sen!4sca",
+            # Singapore configuration (existing)
+            f"!3m2!1sen!2s{region_code}!4m2!1sen!2sus!3sen!4sen"
+        ]
+
+        # Enhanced language markers with multi-regional support
         lang_markers = {
-            'en': f"!4m2!1sen!2s{region_code}",
-            'th': f"!4m2!1sth!2s{region_code}",
-            'ja': f"!4m2!1sja!2s{region_code}",
-            'zh-cn': f"!4m2!1szh!2s{region_code}",
+            'en': self._get_optimal_english_marker(english_language_configs, region_code),
+            'th': f"!3m2!1sth!2s{region_code}!4m2!1sth!2sth!3sth!4sth",
+            'ja': f"!3m2!1sja!2s{region_code}!4m2!1sja!2sjp!3sja!4sja",
+            'zh-cn': f"!3m2!1szh!2s{region_code}!4m2!1szh!2scn!3szh!4szh",
         }
 
-        lang_marker = lang_markers.get(language_key, f"!4m2!1s{sanitized_lang}!2s{region_code}")
+        lang_marker = lang_markers.get(base_lang_code, f"!3m2!1s{sanitized_lang}!2s{region_code}!4m2!1s{sanitized_lang}!2s{region_code}!3s{sanitized_lang}!4s{sanitized_lang}")
 
-        # Complete pb parameter with STRONG language enforcement
+        # Complete pb parameter with language enforcement
         pb_param += f"{lang_marker}!5m2!1sHJ8QacelO62QseMP2dTGqQQ!7e81!8m9!2b1!3b1!5b1!7b1!12m4!1b1!2b1!4m1!1e1!11m4!1e3!2e1!6m1!1i2!13m1!1e1"
 
         rpc_url += f"&pb={quote(pb_param)}"
@@ -1419,8 +1985,15 @@ class ProductionGoogleMapsScraper:
                     timeout=self.config.timeout
                 )
 
-                # Parse response
-                if response.status_code == 200:
+                # Parse response and report proxy result
+                request_success = response.status_code == 200
+
+                # Report proxy performance to enhanced manager
+                if self.proxy_rotator and hasattr(self.proxy_rotator, 'report_proxy_result'):
+                    response_time = response.elapsed.total_seconds() if hasattr(response, 'elapsed') else None
+                    await self.proxy_rotator.report_proxy_result(self.current_proxy, request_success, response_time)
+
+                if request_success:
                     try:
                         raw_data = response.text
                         if raw_data.startswith(")]}'"):
@@ -1438,6 +2011,18 @@ class ProductionGoogleMapsScraper:
 
                         # LANGUAGE CONSISTENCY VALIDATION (Actionable detection and response)
                         if reviews_data and len(reviews_data) > 0:
+                            # Early language drift detection for proactive prevention
+                            if page_num >= 10:
+                                is_drifting, drift_level, action = self._check_language_drift_early(page_num, reviews_data)
+                                if is_drifting:
+                                    safe_print(f"   EARLY WARNING: Language drift detected at page {page_num} (level: {drift_level})")
+                                    if action == "refresh_immediate":
+                                        safe_print(f"   PROACTIVE: Refreshing session due to high language drift")
+                                        self._refresh_session_identity(f"early language drift detected (level: {drift_level})")
+                                        # Re-request the page with fresh session
+                                        safe_print(f"   Re-requesting page {page_num} due to early drift detection...")
+                                        continue
+
                             # Analyze response language consistency
                             is_consistent, primary_language = self._detect_response_language_consistency(reviews_data, page_num)
 
@@ -1454,8 +2039,8 @@ class ProductionGoogleMapsScraper:
 
                         # Parse reviews
                         reviews = []
-                        for el in reviews_data:
-                            review = self.parse_review(el, page_num)
+                        for review_idx, el in enumerate(reviews_data):
+                            review = self.parse_review(el, page_num, review_idx)
                             if review:
                                 reviews.append(review)
 
@@ -1584,6 +2169,8 @@ class ProductionGoogleMapsScraper:
         # Set consistent headers that will be merged with request-specific headers
         client_kwargs = {
             "timeout": self.config.timeout,
+            "http2": True,
+            "verify": True,
             "headers": {
                 "Accept-Language": f"{self.config.language}-{self.config.region.upper()},{self.config.language};q=0.9,en;q=0.8",
                 "Accept": "application/json, text/plain, */*",
@@ -1591,16 +2178,23 @@ class ProductionGoogleMapsScraper:
                 "Cache-Control": "no-cache",
                 "Pragma": "no-cache",
                 "Accept-Charset": "utf-8",
-                "Content-Type": "application/json; charset=utf-8"
+                "Content-Type": "application/json; charset=utf-8",
+                "Connection": "keep-alive"
             }
         }
 
+        # Enhanced proxy handling
         if self.current_proxy:
             proxy_dict = self.current_proxy.to_httpx_proxies() if hasattr(self.current_proxy, 'to_httpx_proxies') else None
             if proxy_dict:
                 client_kwargs['proxies'] = proxy_dict
-                safe_print(f"Using proxy: {list(proxy_dict.values())[0]}")
+                proxy_name = self._get_proxy_display_name(self.current_proxy)
+                safe_print(f"Using proxy: {proxy_name}")
                 print()
+        elif self.config.use_proxy and self.proxy_rotator:
+            safe_print("⚠️ Proxy enabled but no current proxy available")
+            safe_print("This may indicate proxy manager initialization issues")
+            print()
 
         async with httpx.AsyncClient(**client_kwargs) as client:
             page_num = 1
@@ -1845,6 +2439,44 @@ class ProductionGoogleMapsScraper:
                 'reason': 'Translation disabled in configuration'
             }
 
+        # Final language consistency report for English optimization
+        if hasattr(self, 'language_consistency_monitor') and self.config.language.lower() == 'en':
+            final_report = self.language_consistency_monitor.get_detailed_report()
+            safe_print("=" * 80)
+            safe_print("FINAL LANGUAGE CONSISTENCY REPORT")
+            safe_print("=" * 80)
+            safe_print(f"Target Language: English")
+            safe_print(f"Reviews Analyzed: {final_report['total_reviews']}")
+            safe_print(f"English Consistency: {final_report['current_consistency']:.1%}")
+            safe_print(f"Language Distribution: {dict(final_report['language_distribution'])}")
+            safe_print(f"Session Refreshes: {final_report['session_refreshes']}")
+            safe_print(f"Recovery Triggers: {final_report['recovery_triggers']}")
+
+            # Add language consistency data to metadata
+            metadata['language_consistency'] = {
+                'target_language': 'en',
+                'total_reviews_analyzed': final_report['total_reviews'],
+                'english_consistency_percentage': final_report['current_consistency'],
+                'language_distribution': dict(final_report['language_distribution']),
+                'session_refreshes': final_report['session_refreshes'],
+                'recovery_triggers': final_report['recovery_triggers'],
+                'monitoring_active': True,
+                'consistency_threshold': self.language_consistency_monitor.consistency_threshold,
+                'target_achieved': final_report['current_consistency'] >= self.language_consistency_monitor.consistency_threshold
+            }
+
+        # Cleanup enhanced proxy manager resources
+        if (self.config.use_enhanced_proxy_manager and
+            self.proxy_rotator and
+            hasattr(self.proxy_rotator, 'shutdown')):
+            try:
+                # Some proxy managers might have a shutdown method
+                if hasattr(self.proxy_rotator, 'shutdown'):
+                    await self.proxy_rotator.shutdown()
+                safe_print("✅ Enhanced proxy manager shutdown complete")
+            except Exception as e:
+                safe_print(f"⚠️ Proxy manager cleanup warning: {e}")
+
         return {
             'reviews': all_reviews,
             'metadata': metadata
@@ -1951,7 +2583,35 @@ def create_production_scraper(
     # Debug and analysis options
     enable_pb_analysis: bool = False,
     pb_analysis_verbose: bool = False,
-    save_pb_analysis: bool = False
+    save_pb_analysis: bool = False,
+    # Enhanced proxy settings
+    use_enhanced_proxy_manager: bool = False,
+    proxy_use_static_sources: bool = True,
+    proxy_use_dynamic_sources: bool = True,
+    proxy_use_singapore_sources: bool = True,
+    proxy_use_english_sources: bool = True,
+    proxy_singapore_priority: bool = True,
+    proxy_english_fallback: bool = True,
+    proxy_static_urls: Optional[List[str]] = None,
+    proxy_protocols_enabled: Optional[List[str]] = None,
+    proxy_dynamic_countries: Optional[List[str]] = None,
+    proxy_dynamic_count: int = 50,
+    proxy_dynamic_anonymity: Optional[List[str]] = None,
+    proxy_max_pool_size: int = 1000,
+    proxy_test_timeout: float = 5.0,
+    proxy_test_url: str = "http://httpbin.org/ip",
+    proxy_min_success_rate: float = 50.0,
+    proxy_max_response_time: float = 10.0,
+    proxy_rotation_strategy: str = "health_based",
+    proxy_health_check_interval: int = 300,
+    proxy_refresh_interval: int = 3600,
+    proxy_concurrent_tests: int = 50,
+    proxy_enable_geographic_routing: bool = False,
+    proxy_enable_protocol_optimization: bool = True,
+    proxy_failover_enabled: bool = True,
+    proxy_performance_tracking: bool = True,
+    proxy_debug_mode: bool = False,
+    proxy_save_stats: bool = True
 ) -> ProductionGoogleMapsScraper:
     """
     Factory function to create configured production scraper
@@ -1992,7 +2652,35 @@ def create_production_scraper(
         # Debug and analysis options
         enable_pb_analysis=enable_pb_analysis,
         pb_analysis_verbose=pb_analysis_verbose,
-        save_pb_analysis=save_pb_analysis
+        save_pb_analysis=save_pb_analysis,
+        # Enhanced proxy settings
+        use_enhanced_proxy_manager=use_enhanced_proxy_manager,
+        proxy_use_static_sources=proxy_use_static_sources,
+        proxy_use_dynamic_sources=proxy_use_dynamic_sources,
+        proxy_use_singapore_sources=proxy_use_singapore_sources,
+        proxy_use_english_sources=proxy_use_english_sources,
+        proxy_singapore_priority=proxy_singapore_priority,
+        proxy_english_fallback=proxy_english_fallback,
+        proxy_static_urls=proxy_static_urls,
+        proxy_protocols_enabled=proxy_protocols_enabled,
+        proxy_dynamic_countries=proxy_dynamic_countries,
+        proxy_dynamic_count=proxy_dynamic_count,
+        proxy_dynamic_anonymity=proxy_dynamic_anonymity,
+        proxy_max_pool_size=proxy_max_pool_size,
+        proxy_test_timeout=proxy_test_timeout,
+        proxy_test_url=proxy_test_url,
+        proxy_min_success_rate=proxy_min_success_rate,
+        proxy_max_response_time=proxy_max_response_time,
+        proxy_rotation_strategy=proxy_rotation_strategy,
+        proxy_health_check_interval=proxy_health_check_interval,
+        proxy_refresh_interval=proxy_refresh_interval,
+        proxy_concurrent_tests=proxy_concurrent_tests,
+        proxy_enable_geographic_routing=proxy_enable_geographic_routing,
+        proxy_enable_protocol_optimization=proxy_enable_protocol_optimization,
+        proxy_failover_enabled=proxy_failover_enabled,
+        proxy_performance_tracking=proxy_performance_tracking,
+        proxy_debug_mode=proxy_debug_mode,
+        proxy_save_stats=proxy_save_stats
     )
 
     return ProductionGoogleMapsScraper(config)

@@ -78,8 +78,8 @@ The automatic translation feature is temporarily **disabled** due to a technical
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/google-maps-rpc-scraper.git
-cd google-maps-rpc-scraper/google-maps-scraper-python
+git clone https://github.com/neckttiie090520/Google-map-RPC-scraper.git
+cd Google-map-RPC-scraper/google-maps-scraper-python
 
 # Install dependencies
 pip install -r requirements.txt
@@ -151,7 +151,7 @@ google-maps-scraper-python/
 │   ├── templates/                   # HTML templates
 │   └── static/                      # CSS, JS, images
 ├── outputs/                         # Scraped data output
-├── test_scraper.py                  # Quick test script
+├── test_simple.py                  # Quick test script
 ├── requirements.txt                 # Python dependencies
 ├── .env                             # Configuration (optional)
 ├── CLAUDE.md                        # Developer documentation
@@ -459,7 +459,7 @@ print(f"Proxy switches: {result['metadata']['stats']['proxy_switches']}")
 
 ```bash
 # Test with Central World Bangkok (1000+ reviews)
-python test_scraper.py
+python test_simple.py
 ```
 
 ### Expected Output
@@ -781,8 +781,8 @@ This project stands on the shoulders of these amazing open-source projects:
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/google-maps-rpc-scraper/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/google-maps-rpc-scraper/discussions)
+- **Issues**: [GitHub Issues](https://github.com/neckttiie090520/Google-map-RPC-scraper/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/neckttiie090520/Google-map-RPC-scraper/discussions)
 - **Email**: your.email@example.com
 
 ---

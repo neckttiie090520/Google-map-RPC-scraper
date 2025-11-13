@@ -2,6 +2,19 @@
 
 This file provides comprehensive guidance to Claude Code (claude.ai/code) when working with this repository.
 
+## Repository Status (2025-11-13)
+
+### ✅ Working Components:
+- **Webapp**: Flask application with modern UI
+- **Scraper**: Production scraper with httpx (26-40+ reviews/sec)
+- **Search**: RPC place search with autocomplete
+- **Thai Provinces**: Complete province search system
+- **Language-Region**: 12+ presets with smart parsing
+
+### ❌ Known Issues:
+- **Translation System**: `'float' object has no attribute 'as_dict'` error (temporarily disabled)
+- **Function Name Collision**: Thai provinces suggestions (fixed in code)
+
 ## Project Overview
 
 Google Maps RPC Scraper - Production-ready Python web scraper for extracting Google Maps reviews and place data using Google's internal RPC API (no API key required). Achieves 26-40+ reviews/sec with complete anti-bot protection.
