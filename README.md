@@ -1,5 +1,10 @@
 # Google Maps RPC Scraper 🗺️
 
+> **Project status:** This is an exploratory data-collection project that depends on undocumented third-party responses. The throughput, coverage and production-readiness statements below are historical project claims and have not been independently benchmarked or validated for the current service. The translation feature is currently documented as unavailable. See the [engineering story](https://www.linkedin.com/pulse/scraper-only-beginning-teeraphat-raksawong-eohwc/) for the design context and limitations.
+>
+> The repository contains examples of collected reviews. Treat reviewer information responsibly, and check applicable permissions and terms before collecting or reusing data.
+
+
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Framework](https://img.shields.io/badge/Framework-Production%20Ready-brightgreen.svg)]()
